@@ -2,22 +2,49 @@ import type { DB } from '../db';
 import type { Variant } from '../catalog/variants';
 import { computeMoves, type DupeInput, type Move, type PriceDropInput, type TradeMatchInput } from '../domain/nextBestMove';
 import { goalViews, type GoalView } from './goals';
-import { listHoldings } from './collection';
+import { CONDITION_MULTIPLIER, type Condition } from '../domain/conditions';
 
 const key = (cardId: string, variant: string) => `${cardId}::${variant}`;
 
-/** Cards the collector holds more than one of — the raw material for trades. */
+/**
+ * Cards the collector holds more than one of — the raw material for trades.
+ *
+ * Filtered in SQL rather than by loading and decorating the entire collection:
+ * for a 15,000-card collector that was 15,000 rows materialised to find a few
+ * dozen duplicates. Graded cards are excluded — a slab is not a spare, and it
+ * carries no value SetValue is willing to quote.
+ */
 export function duplicates(db: DB, userId: string): DupeInput[] {
-  return listHoldings(db, userId)
-    .filter((h) => h.quantity > 1)
-    .map((h) => ({
-      cardId: h.card_id,
-      name: h.name,
-      number: h.number,
-      variant: h.variant,
-      imageSmall: h.image_small,
-      spareCopies: h.quantity - 1,
-      unitValueCents: h.unitValueCents,
+  const rows = db
+    .prepare(
+      `SELECT ci.card_id, ci.variant, ci.quantity, ci.condition,
+              c.name, c.number, c.image_small,
+              COALESCE(p.market_cents, p.mid_cents, p.low_cents) AS base_cents
+       FROM collection_items ci
+       JOIN cards c ON c.id = ci.card_id
+       LEFT JOIN prices p
+              ON p.card_id = ci.card_id AND p.variant = ci.variant AND p.provider = 'tcgplayer'
+       WHERE ci.user_id = ? AND ci.quantity > 1 AND IFNULL(ci.grade_company,'') = ''
+       ORDER BY base_cents DESC
+       LIMIT 500`,
+    )
+    .all(userId) as {
+    card_id: string; variant: string; quantity: number; condition: Condition;
+    name: string; number: string; image_small: string | null; base_cents: number | null;
+  }[];
+
+  return rows
+    .map((r) => ({
+      cardId: r.card_id,
+      name: r.name,
+      number: r.number,
+      variant: r.variant,
+      imageSmall: r.image_small,
+      spareCopies: r.quantity - 1,
+      unitValueCents:
+        r.base_cents === null
+          ? null
+          : Math.round(r.base_cents * (CONDITION_MULTIPLIER[r.condition] ?? 1)),
     }))
     .sort((a, b) => (b.unitValueCents ?? 0) * b.spareCopies - (a.unitValueCents ?? 0) * a.spareCopies);
 }
@@ -50,6 +77,19 @@ export interface TradeCandidate extends TradeMatchInput {
  */
 export const TRADE_MATCH_LIMIT = 400;
 
+interface OfferedRow {
+  user_id: string;
+  card_id: string;
+  variant: string;
+  quantity: number;
+  handle: string;
+  display_name: string;
+  name: string;
+  number: string;
+  image_small: string | null;
+  market_cents: number | null;
+}
+
 export function tradeMatches(
   db: DB,
   userId: string,
@@ -61,30 +101,67 @@ export function tradeMatches(
   const mine = missingSlotKeys(views);
   if (!mine.size) return [];
 
-  const placeholders = setIds.map(() => '?').join(',');
-  const offered = db
-    .prepare(
-      `SELECT ci.user_id, ci.card_id, ci.variant, ci.quantity,
-              u.handle, u.display_name,
-              c.name, c.number, c.image_small,
-              p.market_cents
-       FROM collection_items ci
-       JOIN users u ON u.id = ci.user_id
-       JOIN cards c ON c.id = ci.card_id
-       LEFT JOIN prices p ON p.card_id = ci.card_id AND p.variant = ci.variant AND p.provider='tcgplayer'
-       WHERE ci.user_id != ? AND ci.for_trade = 1 AND c.set_id IN (${placeholders})
-       ORDER BY p.market_cents DESC
-       LIMIT ?`,
-    )
-    .all(userId, ...setIds, (opts.limit ?? TRADE_MATCH_LIMIT) * 4) as {
-    user_id: string; card_id: string; variant: string; quantity: number;
-    handle: string; display_name: string; name: string; number: string;
-    image_small: string | null; market_cents: number | null;
-  }[];
+  // Two strategies, chosen by how much this collector is missing.
+  //
+  // Narrowing by missing card id is far cheaper for a typical collector (one
+  // or two goals), because the card_id lookup is indexed and the trade
+  // inventory of a popular set is large. But a collector chasing eight master
+  // sets is missing thousands of cards, and the chunked IN clauses then cost
+  // more than simply scanning the sets' trade inventory once. Measured at 5,010
+  // collectors: 219ms scoped vs 96ms narrowed for a typical collector. Each
+  // chunk is itself capped, because a single popular card can carry hundreds of
+  // trade listings once the user base is large, and the sort that picks the
+  // most valuable matches happens after the rows are bounded.
+  const missingCardIds = [...new Set([...mine].map((k) => k.split('::')[0]!))];
+  const NARROW_THRESHOLD = 2000;
+  const limit = opts.limit ?? TRADE_MATCH_LIMIT;
+  const rows: OfferedRow[] = [];
 
-  const wanted = offered
+  const SELECT = `SELECT ci.user_id, ci.card_id, ci.variant, ci.quantity,
+                         u.handle, u.display_name,
+                         c.name, c.number, c.image_small,
+                         p.market_cents
+                  FROM collection_items ci
+                  JOIN users u ON u.id = ci.user_id
+                  JOIN cards c ON c.id = ci.card_id
+                  LEFT JOIN prices p
+                         ON p.card_id = ci.card_id AND p.variant = ci.variant
+                        AND p.provider = 'tcgplayer'`;
+
+  if (missingCardIds.length <= NARROW_THRESHOLD) {
+    const CARD_CHUNK = 400;
+    for (let i = 0; i < missingCardIds.length; i += CARD_CHUNK) {
+      const chunk = missingCardIds.slice(i, i + CARD_CHUNK);
+      rows.push(
+        ...(db
+          .prepare(
+            `${SELECT}
+             WHERE ci.for_trade = 1 AND ci.user_id != ?
+               AND ci.card_id IN (${chunk.map(() => '?').join(',')})
+             ORDER BY p.market_cents DESC
+             LIMIT ?`,
+          )
+          .all(userId, ...chunk, limit * 2) as OfferedRow[]),
+      );
+    }
+  } else {
+    const placeholders = setIds.map(() => '?').join(',');
+    rows.push(
+      ...(db
+        .prepare(
+          `${SELECT}
+           WHERE ci.user_id != ? AND ci.for_trade = 1 AND c.set_id IN (${placeholders})
+           ORDER BY p.market_cents DESC
+           LIMIT ?`,
+        )
+        .all(userId, ...setIds, limit * 6) as OfferedRow[]),
+    );
+  }
+
+  const wanted = rows
     .filter((o) => mine.has(key(o.card_id, o.variant)))
-    .slice(0, opts.limit ?? TRADE_MATCH_LIMIT);
+    .sort((a, b) => (b.market_cents ?? 0) - (a.market_cents ?? 0))
+    .slice(0, limit);
   if (!wanted.length) return [];
 
   // Does each counterpart need anything this collector holds spare?
