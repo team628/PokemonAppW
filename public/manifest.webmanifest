@@ -1,0 +1,13 @@
+{
+  "name": "SetValue — Pokémon collection OS",
+  "short_name": "SetValue",
+  "description": "What you have, what you need, what it is worth.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#0B0E14",
+  "theme_color": "#0B0E14",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #0b0e14;
+  --panel: #121722;
+  --line: #1e2634;
+  --mute: #8a94a6;
+  --need: #ff8a3d;
+  --have: #2dd4a7;
+  --gold: #ffc93c;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: #e8ecf4;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+}
+
+/* Tabular figures everywhere a number can change — stops dollar amounts from
+   jittering as they update during a card show. */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.01em;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-ink-line bg-ink-soft;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-ink-line bg-ink-soft px-2.5 py-1 text-xs text-ink-mute;
+  }
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold
+           transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply btn bg-white text-ink;
+  }
+  .btn-need {
+    @apply btn bg-need text-ink;
+  }
+  .btn-ghost {
+    @apply btn border border-ink-line bg-ink-soft text-white hover:border-white/25;
+  }
+  .field {
+    @apply w-full rounded-xl border border-ink-line bg-ink px-3 py-3 text-[16px] text-white
+           outline-none placeholder:text-ink-mute focus:border-white/30;
+  }
+  .label {
+    @apply text-[11px] font-semibold uppercase tracking-[.12em] text-ink-mute;
+  }
+}
+
+/* Horizontal rails: swipeable on touch, no visible scrollbar. */
+.rail {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x mandatory;
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+.rail > * {
+  scroll-snap-align: start;
+}
+
+/* Card art: keeps the 5:7 trading-card ratio at any width. */
+.card-art {
+  aspect-ratio: 245 / 342;
+}
+
+.dim {
+  filter: grayscale(1) brightness(0.45);
+}
+
+@keyframes confettiFall {
+  0% { transform: translateY(-12vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(102vh) rotate(720deg); opacity: 0.9; }
+}
+.confetti-piece {
+  position: fixed;
+  top: 0;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  animation: confettiFall linear forwards;
+  pointer-events: none;
+  z-index: 60;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
