@@ -1,7 +1,6 @@
-import { afterAll, describe, expect, it } from 'vitest';
-import { existsSync } from 'node:fs';
-import path from 'node:path';
-import { openDb, type DB } from '@/lib/db';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { withServiceRole, closePool } from '@/lib/db/pg';
 import { matchRows, parseCsv, parseRows } from '@/lib/services/import';
 
 describe('parseCsv', () => {
@@ -69,69 +68,81 @@ describe('parseRows', () => {
   });
 });
 
-const DB_PATH = path.join(process.cwd(), 'data', 'setvalue.db');
-const hasData = existsSync(DB_PATH);
-const describeData = hasData ? describe : describe.skip;
+let user = '';
+const suffix = randomUUID().slice(0, 8);
 
-let db: DB | undefined;
-if (hasData) db = openDb(DB_PATH);
-afterAll(() => db?.close());
+beforeAll(async () => {
+  user = (await withServiceRole((tx) =>
+    tx.one<{ id: string }>(
+      `insert into auth.users (email, raw_user_meta_data)
+       values ($1::citext, jsonb_build_object('display_name', 'Importer'::text)) returning id`,
+      [`import-${suffix}@example.test`],
+    ),
+  ))!.id;
+});
 
-const match = (csv: string) => matchRows(db!, parseRows(csv).rows);
+afterAll(async () => {
+  await withServiceRole((tx) =>
+    tx.exec('delete from auth.users where id = $1::uuid', [user]),
+  );
+  await closePool();
+});
 
-describeData('matchRows against the real catalog', () => {
-  it('resolves a row by set name and card number', () => {
-    const r = match('Set,Number,Qty\nBase,4,1').rows[0]!;
+const match = (csv: string) => matchRows(user, parseRows(csv).rows);
+
+describe('matchRows against the real catalog', () => {
+  it('resolves a row by set name and card number', async () => {
+    const r = (await match('Set,Number,Qty\nBase,4,1')).rows[0]!;
     expect(r.confidence).toBe('exact');
     expect(r.cardId).toBe('base1-4');
     expect(r.cardName).toBe('Charizard');
   });
 
-  it('resolves by set code and by set id as well as by name', () => {
-    expect(match('Set,Number\nbase1,4').rows[0]!.cardId).toBe('base1-4');
-    expect(match('Set,Number\nBS,4').rows[0]!.cardId).toBe('base1-4');
+  it('resolves by set code and by set id as well as by name', async () => {
+    expect((await match('Set,Number\nbase1,4')).rows[0]!.cardId).toBe('base1-4');
+    expect((await match('Set,Number\nBS,4')).rows[0]!.cardId).toBe('base1-4');
   });
 
-  it('picks the card’s real printing, not a printing that does not exist', () => {
+  it('picks the card’s real printing, not a printing that does not exist', async () => {
     // Base Set has no reverse holos; asking for one must not invent a slot.
-    const r = match('Set,Number,Printing\nBase,4,Reverse Holo').rows[0]!;
+    const r = (await match('Set,Number,Printing\nBase,4,Reverse Holo')).rows[0]!;
     expect(r.confidence).toBe('exact');
     expect(r.resolvedVariant).toBe('holofoil');
     expect(r.reason).toMatch(/no reverseHolofoil printing/);
   });
 
-  it('honours a stated printing the card actually has', () => {
-    const r = match('Set,Number,Printing\n151,1,Reverse Holo').rows[0]!;
+  it('honours a stated printing the card actually has', async () => {
+    const r = (await match('Set,Number,Printing\n151,1,Reverse Holo')).rows[0]!;
     expect(r.resolvedVariant).toBe('reverseHolofoil');
   });
 
-  it('refuses a card name that appears in many sets', () => {
-    const r = match('Name,Qty\nPikachu,1').rows[0]!;
+  it('refuses a card name that appears in many sets', async () => {
+    const r = (await match('Name,Qty\nPikachu,1')).rows[0]!;
     expect(r.confidence).toBe('ambiguous');
     expect(r.candidates!.length).toBeGreaterThan(1);
     expect(r.reason).toMatch(/several sets/);
   });
 
-  it('accepts a name once a set narrows it to one card', () => {
-    const r = match('Set,Name\nBase,Charizard').rows[0]!;
+  it('accepts a name once a set narrows it to one card', async () => {
+    const r = (await match('Set,Name\nBase,Charizard')).rows[0]!;
     expect(r.confidence).toBe('exact');
     expect(r.cardId).toBe('base1-4');
   });
 
-  it('reports an unknown card number instead of silently skipping it', () => {
-    const r = match('Set,Number\nBase,9999').rows[0]!;
+  it('reports an unknown card number instead of silently skipping it', async () => {
+    const r = (await match('Set,Number\nBase,9999')).rows[0]!;
     expect(r.confidence).toBe('unmatched');
     expect(r.reason).toMatch(/No card numbered 9999/);
   });
 
-  it('reports a row with nothing to match on', () => {
-    const r = match('Set,Qty\nBase,3').rows[0]!;
+  it('reports a row with nothing to match on', async () => {
+    const r = (await match('Set,Qty\nBase,3')).rows[0]!;
     expect(r.confidence).toBe('unmatched');
     expect(r.reason).toMatch(/no card number or name/);
   });
 
-  it('counts matched, ambiguous and unmatched rows separately', () => {
-    const result = match(
+  it('counts matched, ambiguous and unmatched rows separately', async () => {
+    const result = await match(
       ['Set,Number,Name,Qty', 'Base,4,Charizard,1', 'Base,9999,Nonsense,1', ',,Pikachu,1'].join('\n'),
     );
     expect(result.matched).toBe(1);
@@ -140,10 +151,10 @@ describeData('matchRows against the real catalog', () => {
     expect(result.totalQuantity).toBe(1); // only matched rows count toward the import
   });
 
-  it('handles a large file without choking', () => {
+  it('handles a large file without choking', async () => {
     const lines = ['Set,Number,Qty'];
     for (let i = 1; i <= 102; i++) lines.push(`Base,${i},1`);
-    const result = match(lines.join('\n'));
+    const result = await match(lines.join('\n'));
     expect(result.matched).toBe(102);
     expect(result.totalQuantity).toBe(102);
   });

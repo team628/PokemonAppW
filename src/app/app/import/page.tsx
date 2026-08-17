@@ -1,4 +1,4 @@
-import { requireUser } from '@/lib/auth';
+import { requireUser } from '@/lib/auth/session';
 import { TopBar } from '@/components/AppShell';
 import { ImportWizard } from '@/components/ImportWizard';
 import { SourceNote } from '@/components/ui';

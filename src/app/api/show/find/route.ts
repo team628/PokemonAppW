@@ -1,52 +1,49 @@
 import { z } from 'zod';
 import { conditionSchema, goalModeSchema, variantSchema, withUser } from '@/lib/api';
-import { recordFind, sessionSummary } from '@/lib/services/show';
-import { metricsForSet } from '@/lib/services/goals';
-import { claimKey, sweepKeys } from '@/lib/services/idempotency';
+import { claimIdempotencyKey, recordFind, sessionSummary } from '@/lib/services/pg/show';
+import { goalMetrics, syncMilestonesForSet } from '@/lib/services/pg';
 
 const body = z.object({
-  sessionId: z.string().min(1),
+  sessionId: z.string().uuid(),
   cardId: z.string().min(1),
   variant: variantSchema,
   paidCents: z.number().int().min(0).nullable().optional(),
   condition: conditionSchema.optional(),
   withMode: goalModeSchema.optional(),
-  /** Client-generated id so a replayed offline queue cannot double-count. */
+  /** Client-generated so a replayed offline queue cannot double-count. */
   idempotencyKey: z.string().max(64).optional(),
 });
 
 export async function POST(req: Request) {
-  return withUser(async ({ user, db }) => {
+  return withUser(async ({ user }) => {
     const input = body.parse(await req.json());
 
     // Card Show mode queues finds while offline and replays them on reconnect.
-    // Without this guard a flaky hall wifi turns one card into three. The guard
-    // is stored in the database so a restart or a second instance cannot
-    // re-arm a key that has already been used.
-    if (input.idempotencyKey) {
-      sweepKeys(db);
-      if (!claimKey(db, user.id, input.idempotencyKey)) {
-        return { ok: true, duplicate: true };
-      }
+    // The guard is a unique key in PostgreSQL, so it holds across instances and
+    // survives a restart — an in-memory guard re-armed on every deploy.
+    if (input.idempotencyKey && !(await claimIdempotencyKey(user.id, input.idempotencyKey))) {
+      return { ok: true, duplicate: true };
     }
 
-    const result = recordFind(db, user.id, input);
+    const result = await recordFind(user.id, input);
     const mode = input.withMode ?? 'main';
-    const metrics = metricsForSet(db, user.id, result.setId, mode);
+    const milestones = result.first_copy ? await syncMilestonesForSet(user.id, result.set_id) : [];
+    const m = await goalMetrics(user.id, result.set_id, mode);
+
     return {
       ok: true,
-      findId: result.findId,
-      marketCents: result.marketCents,
-      firstCopy: result.firstCopy,
-      milestones: result.milestones.map((m) => m.kind),
-      summary: sessionSummary(db, user.id, input.sessionId),
+      findId: result.find_id,
+      marketCents: result.market_cents,
+      firstCopy: result.first_copy,
+      milestones,
+      summary: await sessionSummary(user.id, input.sessionId),
       metrics: {
-        setId: result.setId,
-        missingCount: metrics.missingCount,
-        ownedCount: metrics.ownedCount,
-        requiredCount: metrics.requiredCount,
-        percent: metrics.percent,
-        needCents: metrics.needCents,
+        setId: result.set_id,
+        missingCount: m.missing_count,
+        ownedCount: m.owned_count,
+        requiredCount: m.required_count,
+        percent: m.required_count ? m.owned_count / m.required_count : 0,
+        needCents: m.need_cents,
       },
     };
   });

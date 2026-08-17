@@ -1,12 +1,16 @@
 import { withUser } from '@/lib/api';
-import { searchCards } from '@/lib/repo/catalog';
+import { searchCards } from '@/lib/services/pg';
 
 export async function GET(req: Request) {
-  return withUser(({ db }) => {
+  return withUser(async ({ user }) => {
     const url = new URL(req.url);
-    const q = url.searchParams.get('q') ?? '';
-    const setId = url.searchParams.get('set') ?? undefined;
-    const limit = Number(url.searchParams.get('limit') ?? 30);
-    return { results: searchCards(db, q, { setId, limit }) };
+    return {
+      results: await searchCards(
+        user.id,
+        url.searchParams.get('q') ?? '',
+        url.searchParams.get('set') ?? undefined,
+        Math.min(Number(url.searchParams.get('limit') ?? 30), 100),
+      ),
+    };
   });
 }

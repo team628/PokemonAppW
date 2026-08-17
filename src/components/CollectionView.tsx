@@ -10,6 +10,8 @@ import { CardArt } from './CardArt';
 
 export interface HoldingView {
   id: string;
+  observedMarketCents: number | null;
+  conditionMultiplier: number;
   cardId: string;
   variant: Variant;
   condition: Condition;
@@ -29,6 +31,8 @@ export interface HoldingView {
 
 export interface CollectionPageData {
   rows: HoldingView[];
+  observedValueCents: number;
+  conditionApplied: boolean;
   total: number;
   page: number;
   pageCount: number;
@@ -92,8 +96,13 @@ export function CollectionView({ data }: { data: CollectionPageData }) {
     <div>
       <div className="panel mb-3 grid grid-cols-2 gap-px overflow-hidden bg-ink-line">
         <div className="bg-ink-soft px-4 py-3">
-          <p className="label">Value shown</p>
+          <p className="label">{data.conditionApplied ? 'Estimated value' : 'Observed value'}</p>
           <p className="num mt-0.5 text-xl font-bold text-have">{money(data.valueCents)}</p>
+          {data.conditionApplied && data.observedValueCents !== data.valueCents && (
+            <p className="text-[11px] text-ink-mute">
+              observed {money(data.observedValueCents)}
+            </p>
+          )}
         </div>
         <div className="bg-ink-soft px-4 py-3">
           <p className="label">Cards shown</p>
@@ -150,6 +159,16 @@ export function CollectionView({ data }: { data: CollectionPageData }) {
             {v.label}
           </button>
         ))}
+        <button
+          onClick={() => navigate({ raw: data.conditionApplied ? '1' : null })}
+          aria-pressed={!data.conditionApplied}
+          title="Show provider-backed figures with no condition model applied"
+          className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${
+            !data.conditionApplied ? 'bg-white text-ink' : 'border border-ink-line text-ink-mute'
+          }`}
+        >
+          Observed only
+        </button>
         <select
           value={sort}
           onChange={(e) => navigate({ sort: e.target.value })}
@@ -278,7 +297,9 @@ function Row({ h }: { h: HoldingView }) {
               <p className="text-[10px] text-ink-mute">no market price</p>
             )}
             {h.conditionAdjusted && h.valueCents !== null && (
-              <p className="text-[10px] text-ink-mute">condition adj.</p>
+              <p className="text-[10px] text-ink-mute" title={`Observed ${money(h.observedMarketCents)} × ${h.conditionMultiplier} (${h.condition} band estimate)`}>
+                est. {Math.round(h.conditionMultiplier * 100)}% of {money(h.observedMarketCents)}
+              </p>
             )}
           </>
         )}

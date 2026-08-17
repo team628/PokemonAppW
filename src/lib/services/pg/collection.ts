@@ -63,9 +63,13 @@ export function decorate(r: HoldingRow, applyCondition = true): Holding {
   const multiplier = CONDITION_MULTIPLIER[r.condition] ?? 1;
 
   if (isGraded) {
+    // Both figures are null, not just the estimate. The raw printing's price is
+    // an observation about a different object: a slab and a raw copy trade
+    // apart, and SetValue has no graded price source. Carrying the raw number
+    // on a graded holding would leave a trap for the next caller that reads it.
     return {
       ...r,
-      observedMarketCents: observed,
+      observedMarketCents: null,
       estimatedValueCents: null,
       conditionMultiplier: 1,
       conditionAdjusted: false,

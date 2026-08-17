@@ -10,17 +10,18 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "ingest:catalog": "tsx scripts/ingest-catalog.ts",
-    "ingest:prices": "tsx scripts/ingest-prices.ts",
+    "ingest:catalog": "tsx scripts/pg/ingest.ts catalog",
+    "ingest:prices": "tsx scripts/pg/ingest.ts prices",
     "seed:demo": "tsx scripts/seed-demo.ts",
-    "setup": "node scripts/fetch-catalog.mjs && node scripts/fetch-prices.mjs && tsx scripts/ingest-catalog.ts && tsx scripts/ingest-prices.ts",
+    "setup": "node scripts/fetch-catalog.mjs && node scripts/fetch-prices.mjs && npm run migrate && npm run ingest:catalog && npm run ingest:prices",
     "snapshot:prices": "./scripts/snapshot-prices.sh",
-    "test:e2e": "node tests/e2e/flow.mjs"
+    "test:e2e": "node tests/e2e/flow.mjs",
+    "migrate": "node scripts/pg/migrate.mjs",
+    "load:generate": "tsx tests/load/generate.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
-    "better-sqlite3": "^13.0.3",
     "next": "^15.5.23",
     "pg": "^8.23.0",
     "react": "^19.2.8",
@@ -28,7 +29,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.2.0",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.2.18",

@@ -1,41 +1,74 @@
 import Link from 'next/link';
-import { requireUser } from '@/lib/auth';
-import { getDb } from '@/lib/db';
+import { notFound } from 'next/navigation';
+import { requireUser } from '@/lib/auth/session';
+import { withIdentity } from '@/lib/db/pg';
 import { TopBar } from '@/components/AppShell';
 import { SectionTitle, SourceNote } from '@/components/ui';
-import { portfolioSummary } from '@/lib/services/collection';
+import { portfolioSummary } from '@/lib/services/pg/collection';
+import { myProfile } from '@/lib/services/pg/profile';
 import { signOutAction } from '@/app/actions/auth';
 import { ShareToggle } from '@/components/ShareToggle';
 import { money } from '@/lib/pricing/quote';
 
 export const dynamic = 'force-dynamic';
 
+interface Coverage {
+  cards: number;
+  sets: number;
+  slots: number;
+  priced: number;
+  inferred: number;
+  newest: string | null;
+  oldest: string | null;
+  snapshots: number;
+}
+
+interface RunRow {
+  kind: string;
+  source: string;
+  finished_at: string | null;
+  rows_written: number;
+  status: string;
+}
+
 export default async function ProfilePage() {
   const user = await requireUser();
-  const db = getDb();
-  const summary = portfolioSummary(db, user.id);
+  const [profile, summary] = await Promise.all([myProfile(user.id), portfolioSummary(user.id)]);
+  if (!profile) notFound();
 
-  const runs = db
-    .prepare('SELECT kind, source, finished_at, rows, notes FROM ingest_runs ORDER BY id DESC LIMIT 4')
-    .all() as { kind: string; source: string; finished_at: string | null; rows: number; notes: string | null }[];
+  const { runs, coverage, freshness } = await withIdentity(user.id, async (tx) => {
+    const runs = await tx.rows<RunRow>(
+      `select kind::text, source, finished_at::text, rows_written, status::text
+       from public.sync_runs
+       order by id desc
+       limit 4`,
+    );
 
-  const coverage = db
-    .prepare(
-      `SELECT
-         (SELECT COUNT(*) FROM cards) AS cards,
-         (SELECT COUNT(*) FROM sets) AS sets,
-         (SELECT COUNT(*) FROM card_variants) AS slots,
-         (SELECT COUNT(*) FROM card_variants v
-            JOIN prices p ON p.card_id = v.card_id AND p.variant = v.variant AND p.provider='tcgplayer') AS priced,
-         (SELECT COUNT(*) FROM card_variants WHERE source='inferred') AS inferred,
-         (SELECT MAX(observed_on) FROM prices WHERE provider='tcgplayer') AS newest,
-         (SELECT MIN(observed_on) FROM prices WHERE provider='tcgplayer') AS oldest,
-         (SELECT COUNT(DISTINCT observed_on) FROM price_points) AS snapshots`,
-    )
-    .get() as {
-    cards: number; sets: number; slots: number; priced: number; inferred: number;
-    newest: string | null; oldest: string | null; snapshots: number;
-  };
+    const coverage = (await tx.one<Coverage>(
+      `select
+         (select count(*) from public.cards)::int as cards,
+         (select count(*) from public.sets)::int as sets,
+         (select count(*) from public.card_variants)::int as slots,
+         (select count(*) from public.card_variants v
+            join public.prices p
+              on p.card_id = v.card_id and p.variant = v.variant and p.provider = 'tcgplayer')::int as priced,
+         (select count(*) from public.card_variants where source = 'inferred')::int as inferred,
+         (select max(observed_on)::text from public.prices where provider = 'tcgplayer') as newest,
+         (select min(observed_on)::text from public.prices where provider = 'tcgplayer') as oldest,
+         (select count(distinct observed_on) from public.price_points)::int as snapshots`,
+    ))!;
+
+    // The scheduled jobs report their own last success rather than the app
+    // guessing from row timestamps — an hourly price run and a nightly catalog
+    // run are separate pipelines and are reported separately.
+    const freshness = await tx.rows<{
+      kind: string; last_success: string | null; last_status: string; age_seconds: number;
+    }>('select kind::text, last_success::text, last_status::text, age_seconds from public.data_freshness()');
+
+    return { runs, coverage, freshness };
+  });
+
+  const displayName = profile.display_name;
 
   return (
     <>
@@ -44,22 +77,25 @@ export default async function ProfilePage() {
         <section className="panel flex items-center gap-4 px-4 py-4">
           <span
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-black text-ink"
-            style={{ background: user.avatar_color }}
+            style={{ background: profile.avatar_color }}
           >
-            {user.display_name.slice(0, 1).toUpperCase()}
+            {displayName.slice(0, 1).toUpperCase()}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-lg font-bold">{user.display_name}</p>
-            <p className="truncate text-xs text-ink-mute">@{user.handle} · {user.email}</p>
+            <p className="truncate text-lg font-bold">{displayName}</p>
+            <p className="truncate text-xs text-ink-mute">
+              @{profile.handle}
+              {user.email && ` · ${user.email}`}
+            </p>
             <p className="num mt-1 text-xs text-have">
-              {summary.totalCards.toLocaleString()} cards · {money(summary.valueCents)}
+              {summary.totalCards.toLocaleString()} cards · {money(summary.estimatedValueCents)}
             </p>
           </div>
         </section>
 
         <section>
           <SectionTitle>Share</SectionTitle>
-          <ShareToggle handle={user.handle} initial={user.share_public === 1} />
+          <ShareToggle handle={profile.handle} initial={profile.share_public} />
         </section>
 
         <section>
@@ -85,11 +121,29 @@ export default async function ProfilePage() {
             {coverage.snapshots < 2 &&
               ' With a single dated snapshot held, price-change features stay switched off rather than guessing at a trend.'}
           </SourceNote>
+
+          {freshness.length > 0 && (
+            <div className="panel mt-3 divide-y divide-ink-line">
+              {freshness.map((f) => (
+                <Row
+                  key={f.kind}
+                  label={JOB_LABEL[f.kind] ?? f.kind}
+                  value={
+                    f.last_success
+                      ? `${describeAge(f.age_seconds)} ago · ${f.last_status}`
+                      : 'never run'
+                  }
+                />
+              ))}
+            </div>
+          )}
+
           {runs.length > 0 && (
             <ul className="mt-3 space-y-1">
               {runs.map((r, i) => (
                 <li key={i} className="num text-[11px] text-ink-mute">
-                  {r.kind} · {r.rows.toLocaleString()} rows · {r.finished_at?.slice(0, 16).replace('T', ' ')} · {r.source}
+                  {r.kind} · {r.rows_written.toLocaleString()} rows ·{' '}
+                  {r.finished_at?.slice(0, 16).replace('T', ' ') ?? 'running'} · {r.source} · {r.status}
                 </li>
               ))}
             </ul>
@@ -110,6 +164,20 @@ export default async function ProfilePage() {
       </main>
     </>
   );
+}
+
+const JOB_LABEL: Record<string, string> = {
+  hourly_prices: 'Hourly price sync',
+  nightly_catalog: 'Nightly catalog sync',
+  want_index: 'Want index rebuild',
+  manual: 'Manual run',
+};
+
+function describeAge(seconds: number): string {
+  if (seconds < 90) return `${seconds}s`;
+  if (seconds < 5400) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 172_800) return `${Math.round(seconds / 3600)}h`;
+  return `${Math.round(seconds / 86_400)}d`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

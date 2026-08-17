@@ -290,11 +290,15 @@ async function ingestPrices() {
   });
 }
 
-const mode = process.argv[2] ?? 'catalog';
-(mode === 'prices' ? ingestPrices() : ingestCatalog())
-  .then(() => closePool())
-  .catch(async (e) => {
-    console.error(e);
-    await closePool();
-    process.exit(1);
-  });
+// Only ingest when run as a script. Tests import `parseNumber` from here, and
+// importing a module must never start a catalog write.
+if (process.argv[1] && /ingest\.ts$/.test(process.argv[1])) {
+  const mode = process.argv[2] ?? 'catalog';
+  void (mode === 'prices' ? ingestPrices() : ingestCatalog())
+    .then(() => closePool())
+    .catch(async (e) => {
+      console.error(e);
+      await closePool();
+      process.exit(1);
+    });
+}

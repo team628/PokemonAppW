@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { AuthError, currentUser, type User } from './auth';
-import { RateLimitError } from './rateLimit';
-import { getDb, type DB } from './db';
+import { AuthError, currentUser, type CurrentUser } from './auth/session';
 import { VARIANTS } from './catalog/variants';
 import { CONDITIONS } from './domain/conditions';
+import { consumeRateLimit } from './services/pg';
 
-/** Thin wrapper so every handler gets a user + db and errors come out uniform. */
+/**
+ * Route-handler plumbing.
+ *
+ * Every handler receives the Supabase-authenticated user id. Data access then
+ * runs under that identity so RLS decides what is reachable — the handler does
+ * not filter, and could not bypass the policies if it tried.
+ */
 export async function withUser<T>(
-  fn: (ctx: { user: User; db: DB }) => Promise<T> | T,
+  fn: (ctx: { user: CurrentUser }) => Promise<T> | T,
 ): Promise<NextResponse> {
   try {
     const user = await currentUser();
     if (!user) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
-    const data = await fn({ user, db: getDb() });
+    const data = await fn({ user });
     return NextResponse.json(data ?? { ok: true });
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: 401 });
@@ -27,7 +32,31 @@ export async function withUser<T>(
       return NextResponse.json({ error: 'Invalid request', issues: e.issues }, { status: 400 });
     }
     const message = e instanceof Error ? e.message : 'Something went wrong';
+    // A PostgreSQL authorization failure is a 403, not a generic 400.
+    if (/row-level security|permission denied/i.test(message)) {
+      return NextResponse.json({ error: 'Not permitted' }, { status: 403 });
+    }
     return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+export class RateLimitError extends Error {
+  constructor(message: string, readonly retryAfterSeconds: number) {
+    super(message);
+    this.name = 'RateLimitError';
+  }
+}
+
+export async function limitOrThrow(
+  bucket: string,
+  rule: { limit: number; windowSeconds: number },
+): Promise<void> {
+  const r = await consumeRateLimit(bucket, rule.limit, rule.windowSeconds);
+  if (!r.allowed) {
+    throw new RateLimitError(
+      `Too many attempts. Try again in ${r.retry_after_seconds}s.`,
+      r.retry_after_seconds,
+    );
   }
 }
 

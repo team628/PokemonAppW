@@ -2,9 +2,9 @@
  * Money formatting, and the shared vocabulary for how a price was derived.
  *
  * The valuation policy these serve lives with the code that applies it:
- * `toRequirement` in src/lib/repo/catalog.ts picks the figure for a set slot,
- * and `decorate` in src/lib/services/collection.ts applies the condition
- * adjustment for a held card.
+ * `slot_market_cents` / `slot_basis` in supabase/migrations/0004 pick the
+ * figure for a set slot, and `decorate` in src/lib/services/pg/collection.ts
+ * applies the condition adjustment for a held card.
  */
 
 export type PriceBasis = 'market' | 'mid' | 'low';

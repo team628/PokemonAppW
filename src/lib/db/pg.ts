@@ -145,8 +145,10 @@ export class Tx {
 }
 
 export async function closePool(): Promise<void> {
-  if (globalThis.__setvalue_pool) {
-    await globalThis.__setvalue_pool.end();
-    globalThis.__setvalue_pool = undefined;
-  }
+  const pool = globalThis.__setvalue_pool;
+  if (!pool) return;
+  // Cleared before awaiting: two teardown hooks racing on the same pool would
+  // otherwise both pass the guard and the second `end()` would throw.
+  globalThis.__setvalue_pool = undefined;
+  await pool.end();
 }

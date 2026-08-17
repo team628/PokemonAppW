@@ -1,4 +1,4 @@
-import type { DB } from '../db';
+import { withIdentity } from '../db/pg';
 import { isVariant, primaryVariant, type Variant } from '../catalog/variants';
 import { CONDITIONS, type Condition } from '../domain/conditions';
 
@@ -190,10 +190,10 @@ interface CardLookupRow {
  * entire catalog bears that name; otherwise the row comes back as ambiguous
  * with its candidates, for a human to settle.
  */
-export function matchRows(db: DB, rows: ParsedRow[]): ImportPreview {
-  const sets = db
-    .prepare('SELECT id, name, ptcgo_code FROM sets')
-    .all() as { id: string; name: string; ptcgo_code: string | null }[];
+export async function matchRows(userId: string, rows: ParsedRow[]): Promise<ImportPreview> {
+  return withIdentity(userId, async (tx) => {
+  const sets = await tx.rows<{ id: string; name: string; ptcgo_code: string | null }>(
+    'select id, name, ptcgo_code from public.sets');
 
   const setByKey = new Map<string, string>();
   for (const s of sets) {
@@ -202,16 +202,17 @@ export function matchRows(db: DB, rows: ParsedRow[]): ImportPreview {
     if (s.ptcgo_code) setByKey.set(normalise(s.ptcgo_code), s.id);
   }
 
-  const findByNumber = db.prepare(
-    'SELECT c.id, c.name, c.number, c.set_id, s.name AS set_name, s.ptcgo_code FROM cards c JOIN sets s ON s.id=c.set_id WHERE c.set_id = ? AND c.number = ?',
-  );
-  const findByName = db.prepare(
-    'SELECT c.id, c.name, c.number, c.set_id, s.name AS set_name, s.ptcgo_code FROM cards c JOIN sets s ON s.id=c.set_id WHERE LOWER(c.name) = LOWER(?) LIMIT 6',
-  );
-  const findByNameInSet = db.prepare(
-    'SELECT c.id, c.name, c.number, c.set_id, s.name AS set_name, s.ptcgo_code FROM cards c JOIN sets s ON s.id=c.set_id WHERE c.set_id = ? AND LOWER(c.name) = LOWER(?) LIMIT 6',
-  );
-  const variantsFor = db.prepare('SELECT variant, is_primary FROM card_variants WHERE card_id = ?');
+  const CARD_SELECT =
+    'select c.id, c.name, c.number, c.set_id, s.name as set_name, s.ptcgo_code from public.cards c join public.sets s on s.id = c.set_id';
+  const findByNumber = (setId: string, num: string) =>
+    tx.rows<CardLookupRow>(`${CARD_SELECT} where c.set_id = $1 and c.number = $2`, [setId, num]);
+  const findByName = (name: string) =>
+    tx.rows<CardLookupRow>(`${CARD_SELECT} where lower(c.name) = lower($1) limit 6`, [name]);
+  const findByNameInSet = (setId: string, name: string) =>
+    tx.rows<CardLookupRow>(`${CARD_SELECT} where c.set_id = $1 and lower(c.name) = lower($2) limit 6`, [setId, name]);
+  const variantsFor = (cardId: string) =>
+    tx.rows<{ variant: string; is_primary: boolean }>(
+      'select variant, is_primary from public.card_variants where card_id = $1', [cardId]);
 
   const out: MatchedRow[] = [];
   let matched = 0, ambiguous = 0, unmatched = 0, totalQuantity = 0;
@@ -222,18 +223,18 @@ export function matchRows(db: DB, rows: ParsedRow[]): ImportPreview {
     let reason: string | undefined;
 
     if (setId && row.numberHint) {
-      hits = findByNumber.all(setId, row.numberHint) as CardLookupRow[];
+      hits = await findByNumber(setId, row.numberHint);
       if (!hits.length && row.nameHint) {
-        hits = findByNameInSet.all(setId, row.nameHint) as CardLookupRow[];
+        hits = await findByNameInSet(setId, row.nameHint);
         if (!hits.length) reason = `No card numbered ${row.numberHint} or named "${row.nameHint}" in that set.`;
       } else if (!hits.length) {
         reason = `No card numbered ${row.numberHint} in that set.`;
       }
     } else if (setId && row.nameHint) {
-      hits = findByNameInSet.all(setId, row.nameHint) as CardLookupRow[];
+      hits = await findByNameInSet(setId, row.nameHint);
       if (!hits.length) reason = `No card named "${row.nameHint}" in that set.`;
     } else if (row.nameHint) {
-      hits = findByName.all(row.nameHint) as CardLookupRow[];
+      hits = await findByName(row.nameHint);
       if (!hits.length) reason = `No card named "${row.nameHint}".`;
       else if (hits.length > 1) reason = 'That card name appears in several sets — a set column would resolve it.';
     } else {
@@ -244,13 +245,13 @@ export function matchRows(db: DB, rows: ParsedRow[]): ImportPreview {
 
     if (hits.length === 1) {
       const hit = hits[0]!;
-      const available = variantsFor.all(hit.id) as { variant: string; is_primary: number }[];
+      const available = await variantsFor(hit.id);
       const names = available.map((v) => v.variant as Variant);
       // An explicitly stated printing is honoured only if the card has it.
       const resolved =
         row.variant && names.includes(row.variant)
           ? row.variant
-          : (available.find((v) => v.is_primary === 1)?.variant as Variant | undefined) ??
+          : (available.find((v) => v.is_primary)?.variant as Variant | undefined) ??
             primaryVariant(names);
 
       out.push({
@@ -282,4 +283,5 @@ export function matchRows(db: DB, rows: ParsedRow[]): ImportPreview {
   }
 
   return { rows: out, matched, ambiguous, unmatched, totalQuantity };
+  });
 }

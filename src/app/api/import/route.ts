@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { withUser } from '@/lib/api';
+import { limitOrThrow, withUser } from '@/lib/api';
 import { matchRows, parseRows } from '@/lib/services/import';
-import { addToCollection } from '@/lib/services/collection';
-import { syncMilestonesForSet } from '@/lib/services/goals';
-import { RULES, limitOrThrow } from '@/lib/rateLimit';
+import { withIdentity } from '@/lib/db/pg';
+import { addWithin } from '@/lib/services/pg/collection';
+import { syncMilestonesForSet, RULES } from '@/lib/services/pg';
 import { isVariant } from '@/lib/catalog/variants';
 import { CONDITIONS } from '@/lib/domain/conditions';
 
@@ -25,18 +25,16 @@ const commit = z.object({
 });
 
 export async function POST(req: Request) {
-  return withUser(async ({ user, db }) => {
+  return withUser(async ({ user }) => {
     const body = z.union([preview, commit]).parse(await req.json());
 
     if (body.mode === 'preview') {
       const { rows, header, recognised } = parseRows(body.csv);
-      const result = matchRows(db, rows);
+      const result = await matchRows(user.id, rows);
       return {
         ok: true,
         header,
         recognised,
-        // Only the first slice is sent back for display; the totals describe
-        // the whole file so the summary never under-reports what was found.
         preview: { ...result, rows: result.rows.slice(0, 400) },
         allRows: result.rows
           .filter((r) => r.confidence === 'exact')
@@ -50,34 +48,31 @@ export async function POST(req: Request) {
       };
     }
 
-    limitOrThrow(`import:${user.id}`, RULES.importCommit);
+    await limitOrThrow(`import:${user.id}`, RULES.importCommit);
 
-    // Imports are all-or-nothing: a half-applied spreadsheet is worse than a
-    // rejected one, because the collector cannot tell which half landed.
-    //
-    // Milestones are deferred and recomputed once per affected set at the end.
-    // Doing it per row recomputed a whole set's metrics thousands of times and
-    // blocked the server for ~48s on a full-size import.
+    // One transaction: a half-applied spreadsheet is worse than a rejected one,
+    // because the collector cannot tell which half landed. Milestones are
+    // deferred to one pass per affected set rather than recomputed per row.
     let added = 0;
-    const touchedSets = new Set<string>();
+    const touched = new Set<string>();
 
-    db.transaction(() => {
+    await withIdentity(user.id, async (tx) => {
       for (const r of body.rows) {
-        const result = addToCollection(db, user.id, {
+        const res = await addWithin(tx, {
           cardId: r.cardId,
           variant: r.variant,
           quantity: r.quantity,
           condition: r.condition ?? 'NM',
           paidCents: r.paidCents ?? null,
           sourceNote: 'CSV import',
-          deferMilestones: true,
         });
-        touchedSets.add(result.setId);
+        touched.add(res.set_id);
         added += r.quantity;
       }
-      for (const setId of touchedSets) syncMilestonesForSet(db, user.id, setId);
-    })();
+    });
 
-    return { ok: true, added, rows: body.rows.length, setsTouched: touchedSets.size };
+    for (const setId of touched) await syncMilestonesForSet(user.id, setId);
+
+    return { ok: true, added, rows: body.rows.length, setsTouched: touched.size };
   });
 }

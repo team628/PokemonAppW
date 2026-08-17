@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { requireUser } from '@/lib/auth';
-import { getDb } from '@/lib/db';
+import { requireUser } from '@/lib/auth/session';
+import { withIdentity } from '@/lib/db/pg';
 import { TopBar } from '@/components/AppShell';
 import { Empty, SectionTitle, SourceNote } from '@/components/ui';
 import { MILESTONE_COPY, type MilestoneKind } from '@/lib/domain/goals';
-import { listSessions } from '@/lib/services/show';
+import { listSessions } from '@/lib/services/pg/show';
 import { money } from '@/lib/pricing/quote';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ interface EventRow {
   type: string;
   set_id: string | null;
   card_id: string | null;
-  payload: string | null;
+  payload: { finds?: number; spentCents?: number } | null;
   created_at: string;
   card_name: string | null;
   card_number: string | null;
@@ -23,32 +23,40 @@ interface EventRow {
 
 export default async function JourneyPage() {
   const user = await requireUser();
-  const db = getDb();
 
-  const events = db
-    .prepare(
-      `SELECT e.*, c.name AS card_name, c.number AS card_number, s.name AS set_name
-       FROM events e
-       LEFT JOIN cards c ON c.id = e.card_id
-       LEFT JOIN sets s ON s.id = e.set_id
-       WHERE e.user_id = ?
-       ORDER BY e.created_at DESC
-       LIMIT 200`,
-    )
-    .all(user.id) as EventRow[];
+  const [{ events, completed, firstEvent }, sessions] = await Promise.all([
+    withIdentity(user.id, async (tx) => {
+      const events = await tx.rows<EventRow>(
+        `select e.id::text, e.type, e.set_id, e.card_id, e.payload, e.created_at::text,
+                c.name as card_name, c.number as card_number, s.name as set_name
+         from public.collection_events e
+         left join public.cards c on c.id = e.card_id
+         left join public.sets s on s.id = e.set_id
+         where e.user_id = $1::uuid
+         order by e.created_at desc
+         limit 200`,
+        [user.id],
+      );
 
-  const completed = db
-    .prepare(
-      `SELECT g.completed_at, s.name, s.id FROM set_goals g JOIN sets s ON s.id = g.set_id
-       WHERE g.user_id = ? AND g.completed_at IS NOT NULL ORDER BY g.completed_at DESC`,
-    )
-    .all(user.id) as { completed_at: string; name: string; id: string }[];
+      const completed = await tx.rows<{ completed_at: string; name: string; id: string }>(
+        `select g.completed_at::text, s.name, s.id
+         from public.set_goals g join public.sets s on s.id = g.set_id
+         where g.user_id = $1::uuid and g.completed_at is not null
+         order by g.completed_at desc`,
+        [user.id],
+      );
 
-  const firstEvent = db
-    .prepare('SELECT MIN(created_at) AS first FROM events WHERE user_id = ?')
-    .get(user.id) as { first: string | null };
+      const firstEvent = await tx.one<{ first: string | null }>(
+        'select min(created_at)::text as first from public.collection_events where user_id = $1::uuid',
+        [user.id],
+      );
 
-  const hunts = listSessions(db, user.id, 10).filter((h) => h.finds > 0);
+      return { events, completed, firstEvent };
+    }),
+    listSessions(user.id, 10),
+  ]);
+
+  const hunts = sessions.filter((h) => h.finds > 0);
   const totalFinds = hunts.reduce((s, h) => s + h.finds, 0);
 
   // Group the feed by calendar day — a collection is remembered in days, not
@@ -72,7 +80,7 @@ export default async function JourneyPage() {
         ) : (
           <>
             <section className="panel grid grid-cols-3 gap-px overflow-hidden bg-ink-line">
-              <Cell label="Collecting since" value={firstEvent.first ? new Date(firstEvent.first).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'} />
+              <Cell label="Collecting since" value={firstEvent?.first ? new Date(firstEvent.first).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'} />
               <Cell label="Sets finished" value={String(completed.length)} />
               <Cell label="Hunt finds" value={String(totalFinds)} />
             </section>
@@ -109,13 +117,13 @@ export default async function JourneyPage() {
                         <p className="truncate text-sm font-semibold">{h.name}</p>
                         <p className="num text-[11px] text-ink-mute">
                           {new Date(h.started_at).toLocaleDateString()} · {h.finds} card
-                          {h.finds === 1 ? '' : 's'} · {money(h.spentCents)} spent
+                          {h.finds === 1 ? '' : 's'} · {money(h.spent_cents)} spent
                         </p>
                       </div>
-                      {h.edgeCents !== null && (
-                        <span className={`num shrink-0 text-xs font-bold ${h.edgeCents >= 0 ? 'text-have' : 'text-need'}`}>
-                          {h.edgeCents >= 0 ? '+' : '−'}
-                          {money(Math.abs(h.edgeCents))}
+                      {h.edge_cents !== null && (
+                        <span className={`num shrink-0 text-xs font-bold ${h.edge_cents >= 0 ? 'text-have' : 'text-need'}`}>
+                          {h.edge_cents >= 0 ? '+' : '−'}
+                          {money(Math.abs(h.edge_cents))}
                         </span>
                       )}
                     </li>
@@ -197,7 +205,8 @@ function describe(e: EventRow): React.ReactNode {
     case 'show_started':
       return <span className="text-ink-mute">Started a hunt</span>;
     case 'show_ended': {
-      const p = e.payload ? JSON.parse(e.payload) : {};
+      // jsonb comes back already parsed by the driver.
+      const p = e.payload ?? {};
       return (
         <>
           Finished a hunt — <span className="font-semibold">{p.finds ?? 0} cards</span>

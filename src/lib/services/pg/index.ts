@@ -323,64 +323,25 @@ async function loadMissing(tx: { rows: <T>(s: string, p?: readonly unknown[]) =>
 
 /**
  * Trade matches: other collectors' spare copies that fill this collector's
- * holes. Narrowed in SQL to the printings actually missing, so the cost tracks
- * the collector's own gaps rather than the size of the trade pool.
+ * holes.
+ *
+ * Goes through `public.trade_matches()` because `collection_items` is
+ * owner-only under RLS — a plain query here returns nothing at all. That
+ * function is the single audited cross-collector read: opt-in rows only,
+ * narrowed to the caller's own missing printings, projecting card identity and
+ * a public handle and nothing else. See migration 0009.
  */
 async function loadTradeMatches(
   tx: { rows: <T>(s: string, p?: readonly unknown[]) => Promise<T[]> },
   goals: GoalView[],
 ) {
   if (!goals.length) return [];
-  const setIds = [...new Set(goals.map((g) => g.setId))];
-  const modes = goals.map((g) => g.mode);
 
   return (await tx.rows<{
     card_id: string; variant: string; name: string; number: string;
     image_small: string | null; market_cents: number | null;
-    handle: string; display_name: string; spare: number; mutual: boolean;
-  }>(
-    `with my_missing as (
-       select s.card_id, s.variant
-       from public.set_goals g
-       cross join lateral public.goal_required_slots(g.set_id, g.mode) s
-       where g.user_id = auth.uid()
-         and not exists (
-           select 1 from public.collection_items ci
-           where ci.user_id = auth.uid() and ci.card_id = s.card_id
-             and ci.variant = s.variant and ci.quantity > 0)
-     ),
-     my_spares as (
-       select ci.card_id, ci.variant from public.collection_items ci
-       where ci.user_id = auth.uid() and ci.quantity > 1 and coalesce(ci.grade_company,'') = ''
-     ),
-     offers as (
-       select ci.user_id, ci.card_id, ci.variant, ci.quantity
-       from public.collection_items ci
-       join my_missing mm on mm.card_id = ci.card_id and mm.variant = ci.variant
-       where ci.for_trade and ci.user_id <> auth.uid()
-       limit 400
-     )
-     select o.card_id, o.variant, c.name, c.number, c.image_small,
-            public.slot_market_cents(p.market_cents,p.mid_cents,p.low_cents) as market_cents,
-            pr.handle, pr.display_name, greatest(o.quantity - 1, 0)::int as spare,
-            exists (
-              select 1 from public.set_goals g2
-              cross join lateral public.goal_required_slots(g2.set_id, g2.mode) s2
-              join my_spares ms on ms.card_id = s2.card_id and ms.variant = s2.variant
-              where g2.user_id = o.user_id
-                and not exists (
-                  select 1 from public.collection_items ci2
-                  where ci2.user_id = o.user_id and ci2.card_id = s2.card_id
-                    and ci2.variant = s2.variant and ci2.quantity > 0)
-            ) as mutual
-     from offers o
-     join public.cards c on c.id = o.card_id
-     left join public.profiles pr on pr.id = o.user_id
-     left join public.prices p on p.card_id = o.card_id and p.variant = o.variant and p.provider='tcgplayer'
-     order by market_cents desc nulls last
-     limit 60`,
-    [],
-  )).map((r) => ({
+    handle: string | null; display_name: string | null; spare_copies: number; mutual: boolean;
+  }>('select * from public.trade_matches($1)', [60])).map((r) => ({
     cardId: r.card_id,
     name: r.name,
     number: r.number,
@@ -390,7 +351,7 @@ async function loadTradeMatches(
     counterpartHandle: r.handle ?? 'a collector',
     counterpartDisplayName: r.display_name ?? 'A collector',
     mutual: r.mutual,
-    spareCopies: r.spare,
+    spareCopies: r.spare_copies,
   }));
 }
 

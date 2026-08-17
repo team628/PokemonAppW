@@ -1,69 +1,60 @@
 import Link from 'next/link';
-import { requireUser } from '@/lib/auth';
-import { getDb } from '@/lib/db';
-import { goalViews, metricsForSet } from '@/lib/services/goals';
-import { activeSession, sessionSummary, startSession } from '@/lib/services/show';
+import { requireUser } from '@/lib/auth/session';
+import { myGoals } from '@/lib/services/pg';
+import { currentOrNewSession, sessionSummary } from '@/lib/services/pg/show';
+import { withIdentity } from '@/lib/db/pg';
 import { TopBar } from '@/components/AppShell';
 import { ShowMode, type PullSlot, type ShowSetOption } from '@/components/ShowMode';
 import { EndHuntButton } from '@/components/EndHuntButton';
 import type { GoalMode } from '@/lib/domain/goals';
+import type { Variant } from '@/lib/catalog/variants';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ShowPage({
   searchParams,
-}: {
-  searchParams: Promise<{ set?: string; mode?: string }>;
-}) {
+}: { searchParams: Promise<{ set?: string; mode?: string }> }) {
   const sp = await searchParams;
   const user = await requireUser();
-  const db = getDb();
 
-  // A hunt starts the moment the mode is opened. Making someone tap "start
-  // session" before they can log a card is friction at exactly the wrong time.
-  const session = activeSession(db, user.id) ?? startSession(db, user.id, {});
-  const summary = sessionSummary(db, user.id, session.id);
+  // A hunt starts the moment the mode opens. Making someone tap "start session"
+  // before they can log a card is friction at exactly the wrong time.
+  const session = await currentOrNewSession(user.id);
+  const [summary, goals] = await Promise.all([
+    sessionSummary(user.id, session.id),
+    myGoals(user.id),
+  ]);
 
-  const views = goalViews(db, user.id).filter((v) => v.metrics.missingCount > 0);
-  const sets: ShowSetOption[] = views.map((v) => ({
-    id: v.set.id,
-    name: v.set.name,
-    mode: v.goal.mode,
-    missingCount: v.metrics.missingCount,
-    needCents: v.metrics.needCents,
-    percent: v.metrics.percent,
+  const active = goals.filter((g) => g.missingCount > 0);
+  const sets: ShowSetOption[] = active.map((g) => ({
+    id: g.setId, name: g.setName, mode: g.mode,
+    missingCount: g.missingCount, needCents: g.needCents, percent: g.percent,
   }));
 
   const chosen = sp.set ?? sets[0]?.id ?? null;
   const mode: GoalMode =
     (['main', 'complete', 'master'] as const).find((m) => m === sp.mode) ??
-    sets.find((s) => s.id === chosen)?.mode ??
-    'main';
+    sets.find((s) => s.id === chosen)?.mode ?? 'main';
 
   let pullList: PullSlot[] = [];
   if (chosen) {
-    const metrics = metricsForSet(db, user.id, chosen, mode);
-    pullList = metrics.missing
-      .sort((a, b) => a.numberSort - b.numberSort)
-      .map((m) => ({
-        cardId: m.cardId,
-        variant: m.variant,
-        number: m.number,
-        name: m.name,
-        rarity: m.rarity,
-        imageSmall: m.imageSmall,
-        marketCents: m.marketCents,
-        acquisitionCents: m.acquisitionCents,
-      }));
+    const rows = await withIdentity(user.id, (tx) =>
+      tx.rows<{
+        card_id: string; variant: string; number: string; name: string;
+        rarity: string | null; image_small: string | null;
+        market_cents: number | null; acquisition_cents: number | null;
+      }>('select * from public.goal_missing($1, $2, 2000, 0)', [chosen, mode]),
+    );
+    pullList = rows.map((m) => ({
+      cardId: m.card_id, variant: m.variant as Variant, number: m.number, name: m.name,
+      rarity: m.rarity, imageSmall: m.image_small,
+      marketCents: m.market_cents, acquisitionCents: m.acquisition_cents,
+    }));
   }
 
   return (
     <>
-      <TopBar
-        title="Card Show"
-        subtitle={session.name}
-        right={<EndHuntButton sessionId={session.id} />}
-      />
+      <TopBar title="Card Show" subtitle={session.name} right={<EndHuntButton sessionId={session.id} />} />
       <main className="px-4 pb-8 pt-4">
         {sets.length === 0 && (
           <div className="panel mb-4 px-4 py-4">
@@ -72,22 +63,11 @@ export default async function ShowPage({
               Card Show mode builds its list from the sets you are chasing. Track one and every card
               you still need shows up here, sorted for digging through a box.
             </p>
-            <Link href="/app/sets" className="btn-primary mt-3 inline-flex">
-              Track a set
-            </Link>
+            <Link href="/app/sets" className="btn-primary mt-3 inline-flex">Track a set</Link>
           </div>
         )}
-        <ShowMode
-          sessionId={session.id}
-          sets={sets}
-          initialSetId={chosen}
-          pullList={pullList}
-          initialSummary={{
-            finds: summary.finds,
-            spentCents: summary.spentCents,
-            marketCents: summary.marketCents,
-          }}
-        />
+        <ShowMode sessionId={session.id} sets={sets} initialSetId={chosen} pullList={pullList}
+          initialSummary={{ finds: summary.finds, spentCents: summary.spentCents, marketCents: summary.marketCents }} />
       </main>
     </>
   );

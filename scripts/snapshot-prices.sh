@@ -9,10 +9,12 @@
 # Change detection needs two readings of the SAME printing, so the price-drop
 # features stay switched off until this has run on at least two days where a
 # provider actually restamped a card. That is deliberate — see
-# src/lib/services/insights.ts.
+# loadPriceDrops in src/lib/services/pg/index.ts.
 #
-# Suggested cron (06:00 daily):
-#   0 6 * * * cd /path/to/setvalue && ./scripts/snapshot-prices.sh >> /var/log/setvalue-prices.log 2>&1
+# In production this is not a cron job on a box: the hourly price sync runs
+# inside Postgres via pg_cron (see supabase/schedule.sql), which is what a
+# serverless deployment can actually rely on. This script is the local
+# equivalent, for a development database.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -22,6 +24,6 @@ echo "=== snapshot $(date -u +%FT%TZ)"
 # and is not re-downloaded.
 rm -rf data/raw/prices
 node scripts/fetch-prices.mjs
-npx tsx scripts/ingest-prices.ts
+npx tsx scripts/pg/ingest.ts prices
 
 echo "=== done $(date -u +%FT%TZ)"

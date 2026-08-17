@@ -16,6 +16,12 @@ const EXEC =
 
 let passed = 0;
 const failures = [];
+/** Checks that cannot run here, reported as blocked rather than silently skipped. */
+const blocked = [];
+
+// Whether the deployment under test is backed by a real Supabase Auth project.
+// Some checks are only meaningful there; the rest run either way.
+const supabaseAuth = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 function check(name, condition, detail = '') {
   if (condition) {
@@ -192,10 +198,17 @@ try {
   await anon.close();
 
   // ------------------------------------------------------- sign-in throttle
+  //
+  // The limiter runs before the credential check, so it is exercisable on any
+  // identity provider. Rejecting a *wrong password* is Supabase Auth's job and
+  // cannot be driven here without a real project — that half is reported
+  // BLOCKED rather than asserted, because the local development provider does
+  // not check passwords at all.
   console.log('\nsign-in throttle');
   const attacker = await browser.newPage();
   let throttled = false;
-  for (let i = 0; i < 13 && !throttled; i++) {
+  let wrongPasswordRejected = false;
+  for (let i = 0; i < 14 && !throttled; i++) {
     await attacker.goto(`${BASE}/signin`);
     await attacker.fill('#email', email);
     await attacker.fill('#password', `wrong-guess-${i}`);
@@ -203,9 +216,18 @@ try {
     await attacker.waitForTimeout(250);
     const text = await attacker.locator('main').innerText();
     if (/Too many sign-in attempts/i.test(text)) throttled = true;
-    else if (!/did not match/i.test(text)) break;
+    if (/did not match/i.test(text)) wrongPasswordRejected = true;
   }
-  check('repeated password guesses get throttled', throttled);
+  check('repeated sign-in attempts get throttled', throttled);
+
+  if (supabaseAuth) {
+    check('a wrong password is rejected', wrongPasswordRejected);
+  } else {
+    console.log(
+      '  BLOCKED — Supabase credentials/environment unavailable: a wrong password is rejected',
+    );
+    blocked.push('a wrong password is rejected');
+  }
   await attacker.close();
 } catch (err) {
   failures.push(`threw: ${err.message}`);
@@ -214,7 +236,13 @@ try {
   await browser.close();
 }
 
-console.log(`\n${passed} passed, ${failures.length} failed`);
+console.log(
+  `\n${passed} passed, ${failures.length} failed${blocked.length ? `, ${blocked.length} blocked` : ''}`,
+);
+if (blocked.length) {
+  console.log('\nblocked — Supabase credentials/environment unavailable:');
+  for (const b of blocked) console.log(`  - ${b}`);
+}
 if (failures.length) {
   console.log('\nfailures:');
   for (const f of failures) console.log(`  - ${f}`);

@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { requireUser } from '@/lib/auth';
-import { getDb } from '@/lib/db';
-import { getCard } from '@/lib/repo/catalog';
+import { requireUser } from '@/lib/auth/session';
+import { withIdentity } from '@/lib/db/pg';
 import { TopBar } from '@/components/AppShell';
 import { SourceNote } from '@/components/ui';
 import { money, euros, daysSince, STALE_AFTER_DAYS } from '@/lib/pricing/quote';
@@ -11,55 +10,96 @@ import { CardActions } from '@/components/CardActions';
 
 export const dynamic = 'force-dynamic';
 
+interface CardRow {
+  id: string;
+  set_id: string;
+  set_name: string;
+  printed_total: number;
+  number: string;
+  name: string;
+  rarity: string | null;
+  artist: string | null;
+  flavor_text: string | null;
+  image_small: string | null;
+  image_large: string | null;
+  is_secret: boolean;
+}
+
+interface PriceRow {
+  variant: string;
+  provider: string;
+  currency: string;
+  low_cents: number | null;
+  mid_cents: number | null;
+  high_cents: number | null;
+  market_cents: number | null;
+  direct_cents: number | null;
+  observed_on: string;
+}
+
 export default async function CardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
-  const db = getDb();
 
-  const card = getCard(db, id);
-  if (!card) notFound();
+  // One round trip under one identity. The collection and goal reads are RLS
+  // scoped to the caller; the catalog reads are the shared, world-readable
+  // tables — the same query would return the same card for anyone.
+  const data = await withIdentity(user.id, async (tx) => {
+    const card = await tx.one<CardRow>(
+      `select c.id, c.set_id, s.name as set_name, s.printed_total, c.number, c.name, c.rarity,
+              c.artist, c.flavor_text, c.image_small, c.image_large, c.is_secret
+       from public.cards c join public.sets s on s.id = c.set_id
+       where c.id = $1`,
+      [id],
+    );
+    if (!card) return null;
 
-  const variants = db
-    .prepare('SELECT variant, source, is_primary FROM card_variants WHERE card_id = ? ORDER BY is_primary DESC, variant')
-    .all(id) as { variant: Variant; source: string; is_primary: number }[];
+    const [variants, prices, owned, history, goalsNeeding] = await Promise.all([
+      tx.rows<{ variant: Variant; source: string; is_primary: boolean }>(
+        `select variant, source::text, is_primary from public.card_variants
+         where card_id = $1 order by is_primary desc, variant`,
+        [id],
+      ),
+      tx.rows<PriceRow>(
+        `select variant, provider, currency, low_cents, mid_cents, high_cents,
+                market_cents, direct_cents, observed_on::text
+         from public.prices where card_id = $1`,
+        [id],
+      ),
+      tx.rows<{ variant: string; qty: number }>(
+        `select variant, sum(quantity)::int as qty from public.collection_items
+         where user_id = $1::uuid and card_id = $2 group by variant`,
+        [user.id, id],
+      ),
+      tx.rows<{ observed_on: string }>(
+        `select distinct observed_on::text from public.price_points
+         where card_id = $1 and provider = 'tcgplayer' and market_cents is not null
+         order by observed_on desc limit 40`,
+        [id],
+      ),
+      tx.rows<{ id: string; mode: string; name: string }>(
+        `select g.id, g.mode::text, s.name from public.set_goals g
+         join public.sets s on s.id = g.set_id
+         where g.user_id = $1::uuid and g.set_id = $2`,
+        [user.id, card.set_id],
+      ),
+    ]);
 
-  const prices = db
-    .prepare('SELECT * FROM prices WHERE card_id = ?')
-    .all(id) as {
-    variant: string; provider: string; currency: string;
-    low_cents: number | null; mid_cents: number | null; high_cents: number | null;
-    market_cents: number | null; direct_cents: number | null; observed_on: string;
-  }[];
+    return { card, variants, prices, owned, history, goalsNeeding };
+  });
 
-  const owned = db
-    .prepare(
-      'SELECT variant, condition, SUM(quantity) AS qty FROM collection_items WHERE user_id = ? AND card_id = ? GROUP BY variant, condition',
-    )
-    .all(user.id, id) as { variant: string; condition: string; qty: number }[];
+  if (!data) notFound();
+  const { card, variants, prices, owned, goalsNeeding } = data;
+
   const ownedByVariant = new Map<string, number>();
   for (const o of owned) ownedByVariant.set(o.variant, (ownedByVariant.get(o.variant) ?? 0) + o.qty);
-
-  const history = db
-    .prepare(
-      `SELECT variant, observed_on, market_cents FROM price_points
-       WHERE card_id = ? AND provider = 'tcgplayer' AND market_cents IS NOT NULL
-       ORDER BY observed_on DESC LIMIT 40`,
-    )
-    .all(id) as { variant: string; observed_on: string; market_cents: number }[];
-  const observationDates = [...new Set(history.map((h) => h.observed_on))];
-
-  const goalsNeeding = db
-    .prepare(
-      `SELECT g.id, g.mode, s.name FROM set_goals g JOIN sets s ON s.id = g.set_id
-       WHERE g.user_id = ? AND g.set_id = ?`,
-    )
-    .all(user.id, card.set_id) as { id: string; mode: string; name: string }[];
+  const observationDates = data.history.map((h) => h.observed_on);
 
   return (
     <>
       <TopBar
         title={card.name}
-        subtitle={`#${card.number} · ${card.set_name ?? card.set_id}`}
+        subtitle={`#${card.number} · ${card.set_name}`}
         back={`/app/sets/${card.set_id}`}
       />
       <main className="px-4 pb-8 pt-4">
@@ -79,7 +119,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
               {card.printed_total ? `/${card.printed_total}` : ''} · {card.rarity ?? 'unknown rarity'}
             </p>
             {card.artist && <p className="mt-1 text-xs text-ink-mute">Illus. {card.artist}</p>}
-            {card.is_secret === 1 && (
+            {card.is_secret && (
               <span className="chip mt-2 border-gold/40 text-gold">Secret rare</span>
             )}
             {card.flavor_text && (

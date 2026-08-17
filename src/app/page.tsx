@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { currentUser } from '@/lib/auth';
-import { getDb } from '@/lib/db';
+import { currentUser } from '@/lib/auth/session';
+import { withIdentity } from '@/lib/db/pg';
 import { money } from '@/lib/pricing/quote';
 
 export const dynamic = 'force-dynamic';
@@ -10,30 +10,38 @@ export default async function Landing() {
   const user = await currentUser();
   if (user) redirect('/app');
 
-  const db = getDb();
-  const stats = db
-    .prepare(
-      `SELECT
-         (SELECT COUNT(*) FROM sets) AS sets,
-         (SELECT COUNT(*) FROM cards) AS cards,
-         (SELECT COUNT(*) FROM card_variants) AS slots,
-         (SELECT COUNT(*) FROM card_variants v
-            JOIN prices p ON p.card_id=v.card_id AND p.variant=v.variant AND p.provider='tcgplayer') AS priced,
-         (SELECT MAX(observed_on) FROM prices WHERE provider='tcgplayer') AS newest`,
-    )
-    .get() as { sets: number; cards: number; slots: number; priced: number; newest: string | null };
+  // Read as an anonymous visitor: the catalog is world-readable under RLS and
+  // nothing on this page is scoped to a collector, so the numbers a signed-out
+  // visitor sees are exactly the ones the policies allow.
+  const { stats, example } = await withIdentity(null, async (tx) => {
+    const stats = (await tx.one<{
+      sets: number; cards: number; slots: number; priced: number; newest: string | null;
+    }>(
+      `select
+         (select count(*) from public.sets)::int as sets,
+         (select count(*) from public.cards)::int as cards,
+         (select count(*) from public.card_variants)::int as slots,
+         (select count(*) from public.card_variants v
+            join public.prices p
+              on p.card_id = v.card_id and p.variant = v.variant and p.provider = 'tcgplayer')::int as priced,
+         (select max(observed_on)::text from public.prices where provider = 'tcgplayer') as newest`,
+    ))!;
 
-  // A real, current example rather than a mock-up: the market value of Base Set
-  // computed from the same tables the product runs on.
-  const example = db
-    .prepare(
-      `SELECT SUM(COALESCE(p.market_cents, p.mid_cents, p.low_cents, 0)) AS cents, COUNT(*) AS n
-       FROM cards c
-       JOIN card_variants v ON v.card_id = c.id AND v.is_primary = 1
-       LEFT JOIN prices p ON p.card_id=c.id AND p.variant=v.variant AND p.provider='tcgplayer'
-       WHERE c.set_id = 'base1'`,
-    )
-    .get() as { cents: number; n: number };
+    // A real, current example rather than a mock-up: the market value of Base
+    // Set computed from the same tables and the same slot valuation the
+    // completion engine runs on.
+    const example = (await tx.one<{ cents: number; n: number }>(
+      `select coalesce(sum(public.slot_market_cents(p.market_cents, p.mid_cents, p.low_cents)), 0)::bigint as cents,
+              count(*)::int as n
+       from public.cards c
+       join public.card_variants v on v.card_id = c.id and v.is_primary
+       left join public.prices p
+         on p.card_id = c.id and p.variant = v.variant and p.provider = 'tcgplayer'
+       where c.set_id = 'base1'`,
+    ))!;
+
+    return { stats, example };
+  });
 
   const coverage = (stats.priced / Math.max(1, stats.slots)) * 100;
 

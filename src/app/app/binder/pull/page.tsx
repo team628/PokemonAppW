@@ -1,53 +1,58 @@
-import { requireUser } from '@/lib/auth';
-import { getDb } from '@/lib/db';
-import { getSet } from '@/lib/repo/catalog';
-import { metricsForSet } from '@/lib/services/goals';
+import { notFound } from 'next/navigation';
+import { requireUser } from '@/lib/auth/session';
+import { goalMetrics } from '@/lib/services/pg';
+import { myProfile } from '@/lib/services/pg/profile';
+import { withIdentity } from '@/lib/db/pg';
 import { money } from '@/lib/pricing/quote';
 import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
-import { notFound } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * A pull list you can print or hand to a dealer.
- *
- * Deliberately plain: light background, black text, no app chrome. This page is
- * meant to survive being printed on a shop's laser printer and read across a
- * table, which is a different design problem than the rest of the product.
+ * A pull list you can print or hand to a dealer. Deliberately plain: light
+ * background, black text, no app chrome — it has to survive a shop's laser
+ * printer and be readable across a table.
  */
 export default async function PullListPage({
   searchParams,
-}: {
-  searchParams: Promise<{ set?: string; mode?: string }>;
-}) {
+}: { searchParams: Promise<{ set?: string; mode?: string }> }) {
   const sp = await searchParams;
   const user = await requireUser();
-  const db = getDb();
   if (!sp.set) notFound();
 
-  const set = getSet(db, sp.set);
-  if (!set) notFound();
-  const mode: GoalMode =
-    (['main', 'complete', 'master'] as const).find((m) => m === sp.mode) ?? 'main';
-  const metrics = metricsForSet(db, user.id, sp.set, mode);
-  const missing = [...metrics.missing].sort((a, b) => a.numberSort - b.numberSort);
+  const mode: GoalMode = (['main', 'complete', 'master'] as const).find((m) => m === sp.mode) ?? 'main';
+
+  const [profile, metrics, data] = await Promise.all([
+    myProfile(user.id),
+    goalMetrics(user.id, sp.set, mode),
+    withIdentity(user.id, async (tx) => {
+      const s = await tx.one<{ name: string }>('select name from public.sets where id = $1', [sp.set]);
+      const missing = await tx.rows<{
+        card_id: string; variant: string; number: string; name: string;
+        rarity: string | null; market_cents: number | null;
+      }>('select * from public.goal_missing($1, $2, 2000, 0)', [sp.set, mode]);
+      return { setName: s?.name, missing };
+    }),
+  ]);
+
+  if (!data.setName) notFound();
 
   return (
     <main className="min-h-dvh bg-white px-6 py-8 text-black print:px-0">
       <header className="border-b-2 border-black pb-3">
-        <h1 className="text-2xl font-black">{set.name} — want list</h1>
+        <h1 className="text-2xl font-black">{data.setName} — want list</h1>
         <p className="mt-1 text-sm">
-          {user.display_name} (@{user.handle}) · {mode} set · {missing.length} cards needed ·{' '}
-          {metrics.ownedCount}/{metrics.requiredCount} complete
+          {profile?.display_name ?? 'Collector'} (@{profile?.handle ?? '—'}) · {mode} set ·{' '}
+          {metrics.missing_count} cards needed · {metrics.owned_count}/{metrics.required_count} complete
         </p>
         <p className="mt-0.5 text-xs text-neutral-600">
-          Market total {money(metrics.needCents)} · lowest listings {money(metrics.needAcquisitionCents)} ·
+          Market total {money(metrics.need_cents)} · lowest listings {money(metrics.need_acquisition_cents)} ·
           generated {new Date().toLocaleDateString()} · prices TCGplayer USD
         </p>
       </header>
 
-      {missing.length === 0 ? (
+      {data.missing.length === 0 ? (
         <p className="mt-8 text-lg font-bold">This set is complete. Nothing to pull.</p>
       ) : (
         <table className="mt-5 w-full border-collapse text-sm">
@@ -61,17 +66,16 @@ export default async function PullListPage({
             </tr>
           </thead>
           <tbody>
-            {missing.map((m) => (
-              <tr key={`${m.cardId}-${m.variant}`} className="border-b border-neutral-300">
+            {data.missing.map((m) => (
+              <tr key={`${m.card_id}-${m.variant}`} className="border-b border-neutral-300">
                 <td className="py-1.5"><span className="inline-block h-3.5 w-3.5 border border-black" /></td>
                 <td className="py-1.5 font-mono">{m.number}</td>
                 <td className="py-1.5 font-medium">{m.name}</td>
                 <td className="py-1.5 text-neutral-600">
-                  {VARIANT_LABEL[m.variant as Variant]}
-                  {m.rarity ? ` · ${m.rarity}` : ''}
+                  {VARIANT_LABEL[m.variant as Variant]}{m.rarity ? ` · ${m.rarity}` : ''}
                 </td>
                 <td className="py-1.5 text-right font-mono">
-                  {m.marketCents === null ? '—' : money(m.marketCents)}
+                  {m.market_cents === null ? '—' : money(m.market_cents)}
                 </td>
               </tr>
             ))}
@@ -80,8 +84,8 @@ export default async function PullListPage({
       )}
 
       <p className="mt-6 text-xs text-neutral-600">
-        {metrics.unpricedMissing > 0 &&
-          `${metrics.unpricedMissing} card${metrics.unpricedMissing === 1 ? '' : 's'} above have no current listing, so the market total is a floor. `}
+        {metrics.unpriced_missing > 0 &&
+          `${metrics.unpriced_missing} card${metrics.unpriced_missing === 1 ? '' : 's'} above have no current listing, so the market total is a floor. `}
         Generated by SetValue.
       </p>
     </main>

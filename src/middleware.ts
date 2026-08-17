@@ -4,8 +4,9 @@ import { NextResponse, type NextRequest } from 'next/server';
  * Security headers.
  *
  * Rate limiting is applied in the handlers themselves rather than here, because
- * middleware runs on the edge runtime where the SQLite-backed counters are not
- * reachable.
+ * middleware runs on the edge runtime, which has no TCP socket and therefore no
+ * PostgreSQL connection. The counters live in the database so that the limit
+ * holds across every serverless instance rather than per process.
  */
 export function middleware(req: NextRequest) {
   const res = NextResponse.next();

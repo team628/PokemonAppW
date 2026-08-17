@@ -12,25 +12,35 @@ It answers the questions a collector actually has:
 
 ```bash
 npm install
-npm run setup      # downloads the catalog + prices, builds data/setvalue.db (~5 min)
-npm run seed:demo  # optional: two demo collectors with real holdings
+export SUPABASE_DB_URL=postgresql://…      # a Supabase project, or any PostgreSQL 15+
+npm run setup       # downloads the catalog + prices, migrates, ingests (~5 min)
+npm run seed:demo   # optional: two demo collectors with real holdings
 npm run build && npm start
 ```
 
-`npm run seed:demo` prints a freshly generated password for the demo accounts — it is not
-stored in this repository, and the script refuses to run under `NODE_ENV=production` unless
-explicitly overridden.
+`npm run setup` runs `npm run migrate`, which applies `supabase/migrations/*.sql` in
+order. Every migration is idempotent, so it is safe to re-run. Against a hosted project
+the same files go through `supabase db push`. See `supabase/README.md` for the
+environment variables and the pg_cron schedule.
+
+`npm run seed:demo` refuses to run under `NODE_ENV=production` unless explicitly
+overridden. Identity comes from Supabase Auth, so the demo accounts have whatever
+password you set for them there.
 
 ```bash
-npm test           # 151 unit, service, parity and data-integrity tests
-npm run test:e2e   # 36-check browser run against a server on :3000
+npm test            # 226 unit, service, parity, RLS, concurrency and integrity tests
+npm run test:e2e    # 36-check browser run against a server on :3000
 npm run typecheck
 
-# load / DoS measurements (writes to a scratch database, never data/setvalue.db)
-npx tsx tests/load/generate.ts 5000
-SETVALUE_DB=/tmp/setvalue-load.db npx next start -p 3100
-node tests/load/measure.mjs http://localhost:3100 <sessionToken> "label"
+# load / DoS measurements
+npm run load:generate -- 5000
+npm run build && npx next start -p 3100
+node tests/load/measure.mjs http://localhost:3100 <identityCookie> "label"
+node tests/load/concurrency.mjs http://localhost:3100 <identityCookie>
 ```
+
+`load:generate` writes into the configured database and clears its own
+`load-*@example.test` population on each run; it does not touch other accounts.
 
 ---
 
@@ -132,61 +142,100 @@ could write.
 ## Architecture
 
 ```
-src/lib/domain/      pure functions — completion maths, Next Best Move, milestones
-src/lib/pricing/     valuation policy: which figure, from where, how old
-src/lib/catalog/     printing taxonomy and era rules
-src/lib/repo/        SQL → domain types (the only place set pricing is assembled)
-src/lib/services/    orchestration: collection, goals, insights, trade, import, hunts
+supabase/migrations/ the schema, the completion engine, the want index, RLS — in SQL
+src/lib/db/pg.ts     the only connection code: pooling and per-request identity
+src/lib/services/pg/ orchestration over those SQL functions
+src/lib/domain/      pure functions — Next Best Move, milestones, the reference engine
+src/lib/pricing/     money formatting and the vocabulary for how a price was derived
+src/lib/catalog/     printing taxonomy and era rules, applied at ingest
+src/lib/providers/   the card-data provider interface and its pokemontcg.io implementation
+src/lib/billing/     Stripe, behind a flag that is off
 src/app/             Next.js App Router — pages, server actions, JSON API
-scripts/             ingest, snapshot, demo seed
-tests/               unit, service (real SQLite), data-integrity, e2e (browser)
+scripts/pg/          migrate and ingest
+tests/pg/            RLS, parity, services, concurrency, demand, integrity, throughput
 ```
 
-The completion engine is pure and takes plain data, so it is tested exhaustively
-without a database. The repository layer's only job is to hand it accurate rows.
+**Storage** is PostgreSQL — a Supabase project in production, plain PostgreSQL locally.
+Connections go through `pg` against the Supavisor transaction pooler, which is what makes
+this safe on Vercel: a serverless function that opens a direct connection per invocation
+exhausts the database's connection slots under any real traffic.
 
-**Storage** is SQLite via `better-sqlite3`. Everything user-owned is keyed by
-`user_id`, nothing is global-mutable, and all SQL lives behind the repo/service
-layer — so moving to hosted Postgres means reimplementing `src/lib/db` and the
-repositories, not the domain model.
+**The completion engine lives in SQL** (`supabase/migrations/0004`). HAVE, NEED and
+COMPLETE are summed from one per-slot value in one pass, in integer cents with `bigint`
+accumulators, so `COMPLETE = HAVE + NEED` is exact by construction rather than
+approximately equal. The TypeScript engine in `src/lib/domain/goals.ts` is retained as an
+independent reference implementation; `tests/pg/parity.test.ts` asserts the two agree
+exactly across nine set/mode combinations on the real catalog.
 
-**Auth** is scrypt password hashing plus opaque session tokens stored only as
-SHA-256 digests, so a database leak does not hand out live sessions. No third-party
-dependency.
+**Authorization is Row Level Security**, not application code. Every user-owned table is
+policed by `user_id = auth.uid()`, and each request runs inside a transaction that sets
+`role` and `request.jwt.claims` — the same mechanism PostgREST uses. A page that forgot a
+`WHERE user_id = …` clause returns nothing rather than someone else's collection.
+`tests/pg/rls.test.ts` attacks this directly: User B authenticates and queries User A's
+rows at the database layer with no filter at all, bypassing every page and route handler.
+
+The two deliberate exceptions are `public_goal_missing()` and `trade_matches()`, both
+SECURITY DEFINER, both narrow, both documented at the point of definition: a shared page
+needs to read the sharer's holdings, and trade matching is a cross-collector question by
+definition. Each re-checks its own opt-in and projects card identity only.
+
+**Auth** is Supabase Auth (`@supabase/ssr`): password sign-in, magic link, reset, and a
+`/auth/callback` code exchange. `getUser()` revalidates the token with the auth server
+rather than trusting cookie contents. A local identity provider stands in only where no
+Supabase project is configured, and refuses to activate whenever `NEXT_PUBLIC_SUPABASE_URL`
+is set or in production without an explicit override.
 
 ### Scale notes
 
-Measured, not assumed. With 5,010 collectors, 9,000 goals and 1.02M collection rows:
+Measured, not assumed. With 5,001 collectors, 9,067 goals and 979k collection rows, as a
+collector holding 15,000 cards:
 
-| | before hardening | after |
+| | SQLite (pre-migration) | PostgreSQL |
 |---|---|---|
-| `/partners` (public) | 15,404 ms | **160 ms** |
-| `/app` (dashboard) | 8,735 ms | **499 ms** |
-| `/app/trade` | 27,456 ms / 19 MB | **444 ms / 70 KB** |
-| `/app/collection` (15k-card collector) | 1,523 ms / 17 MB | **170 ms / 122 KB** |
-| `/signin` under 5 concurrent public requests | 78,494 ms | **7 ms** |
+| `/partners` (public) | 240 ms | **142 ms** |
+| `/app` (dashboard) | 447 ms | **298 ms** |
+| `/app/trade` | 305 ms | **268 ms** |
+| `/app/collection` | 163 ms / 122 KB | **122 ms / 130 KB** |
+| `/app/sets/sv3pt5?mode=master` | 62 ms | **88 ms** |
+| `/app/moves` | 373 ms | **273 ms** |
+| `/signin` under 5 concurrent public requests | 8 ms | **6 ms** |
 
-- **better-sqlite3 is synchronous**, so any multi-second query stalls every request on the
-  process, not just its own. That is why a public page doing an O(users) aggregate was a
-  denial-of-service vector rather than merely a slow page.
-- The want index is **materialised** into `want_index` and rebuilt on a worker thread
-  (`wantIndexWorker.mjs`) on a 5-minute staleness check. No request ever waits for it; the
-  snapshot's age is displayed rather than hidden. `tests/demand-parity.test.ts` asserts the
-  aggregate agrees exactly with the per-user domain engine it replaced.
+The comparison is like-for-like on the same hardware and the same synthetic population.
+The point is not the margin — it is that moving the completion engine into SQL and the
+authorization boundary into RLS cost nothing in latency while removing the single-process
+ceiling entirely.
+
+- The want index is a **summary table maintained incrementally by triggers** on the two
+  things that move the number: ownership and tracked goals. Steady-state cost is
+  proportional to the change, not the user base, and no request ever waits for a rebuild.
+  A materialized view was rejected because `REFRESH` takes an ACCESS EXCLUSIVE lock, which
+  is the wrong shape for a table that changes on every card logged. A nightly full rebuild
+  remains as reconciliation; `tests/pg/demand.test.ts` asserts the trigger-built index and
+  a full recomputation agree exactly after a workload of adds, removes and goal changes.
 - Collection and trade lists page in SQL, so payload is flat regardless of collection size.
-- Bulk import defers milestone recomputation to one pass per set: 2.4 ms/row → 0.13 ms/row,
-  turning a ~48 s server freeze on a 20,000-row import into ~2.7 s.
+- Bulk import commits in one transaction and defers milestone recomputation to one pass per
+  set: measured at ~3,000 rows/s matched and ~2,100 rows/s committed against the real
+  20,444-card catalog.
 - Card art is served straight from the provider CDN rather than proxied, so the app
   server never becomes a bottleneck on a 360-card set page.
 - First-load JS is 103–112 kB across every route.
 
 ### Abuse resistance
 
-- Rate limits are stored in the database (`rate_limits`), not process memory, so a restart
-  does not hand out a fresh budget and limits hold across instances. Sign-in is capped per
-  account *and* per address, sign-up and bulk import per account/address.
+- Rate limits are stored in the database (`rate_limits`) and incremented and read in one
+  statement, so a restart does not hand out a fresh budget, the limit holds across every
+  serverless instance, and twenty simultaneous callers cannot race past it. Sign-in is
+  capped per account *and* per address, sign-up and bulk import per account/address.
 - Card Show replay keys live in `idempotency_keys` for the same reason: an in-memory guard
-  re-armed on every deploy, so a queue replayed after a restart double-counted cards.
+  is re-armed on every deploy, so a queue replayed after a restart double-counted cards.
+- Concurrent writes to one holding are settled inside a single statement, and the derived
+  "this is the first copy" answer is serialised by a transaction-scoped advisory lock keyed
+  on `(collector, card, printing)` — narrow enough that unrelated adds never contend.
+  `tests/pg/concurrency.test.ts` fires twenty simultaneous adds and asserts exactly one
+  acquisition event.
+- The rate-limited render of `/partners` is an HTTP 200 carrying an interstitial rather
+  than a 429, because a Next.js App Router *page* cannot set a response status. The cap
+  itself holds; route handlers do return 429.
 - `x-forwarded-for` is client-controlled, so address-based limits are a speed bump against
   casual abuse, not a defence against a determined attacker with many addresses. Real
   protection belongs at the edge.
@@ -275,9 +324,9 @@ Three hard limits:
 - **No inventory dressed as advice.** A partner holding a card can be shown as an option
   beside the price; it does not change what SetValue tells you to do.
 
-The `partners` and `partner_inventory` tables exist and the demand query is live. A
-production integration would be a scoped, authenticated API over the same
-`demandReport` function.
+The demand query is live and runs through `public.demand_report()`. There is no partner
+API: no partner accounts, inventory tables or API keys exist in the schema, so nothing on
+that page sits behind an integration. It is the signal, shown as it stands.
 
 ---
 
@@ -307,8 +356,16 @@ approximated. Wiring in a graded price feed is the fix; guessing is not.
 
 **No password reset or email verification.** Accounts are email + password only.
 
-**Single-node SQLite.** Correct and fast for the sizes this runs at. See *Scale notes*
-for what changes and where.
+**Graded cards are held but never valued.** A slab and a raw copy are different objects to
+the market, and no defensible graded price source is available here. Graded holdings count
+toward set completion and are reported as a separate count; their value shows as
+unavailable rather than borrowing the raw price.
+
+**Payments are not live.** The Stripe integration, its tables and its webhook receiver
+exist behind `SETVALUE_BILLING_ENABLED`, which is off. While it is off the webhook route
+is a 404 and no code path can reach Stripe. There is no plan, no price and no upgrade
+surface, because advertising something that cannot be bought is the same class of
+dishonesty as quoting a price nobody quoted.
 
 ---
 

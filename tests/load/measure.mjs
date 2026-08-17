@@ -1,7 +1,11 @@
 /**
  * Load, denial-of-service and payload measurements against a running server.
  *
- *   node tests/load/measure.mjs <baseUrl> <sessionToken> [label]
+ *   node tests/load/measure.mjs <baseUrl> <identityCookie> [label]
+ *
+ * The identity cookie is whatever the deployment's auth issues: the
+ * `sv_local_identity` value when running on local development auth, or the
+ * Supabase auth cookie(s) otherwise. Pass the raw `name=value` pair(s).
  *
  * Prints one line per probe so before/after runs diff cleanly.
  */
@@ -9,7 +13,7 @@ const BASE = process.argv[2] ?? 'http://localhost:3100';
 const TOKEN = process.argv[3] ?? '';
 const LABEL = process.argv[4] ?? '';
 
-const cookie = TOKEN ? { cookie: `sv_session=${TOKEN}` } : {};
+const cookie = TOKEN ? { cookie: TOKEN.includes('=') ? TOKEN : `sv_local_identity=${TOKEN}` } : {};
 
 async function probe(path, { auth = true, timeoutMs = 300_000 } = {}) {
   const t0 = performance.now();
@@ -38,6 +42,10 @@ for (const p of [
   '/app/sets/sv3pt5?mode=master',
   '/app/moves',
   '/app/show',
+  '/app/binder',
+  '/app/collection?view=graded',
+  '/app/journey',
+  '/app/profile',
 ]) {
   try {
     row(p, await probe(p));
