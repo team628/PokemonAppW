@@ -8,11 +8,17 @@
  *
  *   node tests/e2e/flow.mjs [baseUrl]
  */
+import { existsSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const BASE = process.argv[2] ?? 'http://localhost:3000';
+
+// This container ships a Chromium at a fixed path; CI installs its own through
+// Playwright. Prefer an explicit override, fall back to the preinstalled binary
+// when it is actually there, and otherwise let Playwright resolve its own.
+const PREINSTALLED = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const EXEC =
-  process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  process.env.PLAYWRIGHT_CHROMIUM ?? (existsSync(PREINSTALLED) ? PREINSTALLED : undefined);
 
 let passed = 0;
 const failures = [];
@@ -38,7 +44,7 @@ const dollars = (text) => {
   return m ? parseFloat(m[1]) : null;
 };
 
-const browser = await chromium.launch({ executablePath: EXEC });
+const browser = await chromium.launch(EXEC ? { executablePath: EXEC } : {});
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } }); // iPhone-sized
 
 try {
