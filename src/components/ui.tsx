@@ -102,42 +102,7 @@ export function SectionTitle({
   );
 }
 
-/** Trading-card thumbnail. `owned=false` desaturates — the visual language of a hole in a set. */
-export function CardArt({
-  src,
-  alt,
-  owned = true,
-  className = '',
-  priority = false,
-}: {
-  src: string | null;
-  alt: string;
-  owned?: boolean;
-  className?: string;
-  priority?: boolean;
-}) {
-  if (!src) {
-    return (
-      <div
-        className={`card-art flex items-center justify-center rounded-lg border border-ink-line bg-ink text-[10px] text-ink-mute ${className}`}
-      >
-        no art
-      </div>
-    );
-  }
-  return (
-    // Plain <img>: card art is served straight from the provider CDN so the app
-    // server never becomes a proxy for thousands of images on a set page.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      loading={priority ? 'eager' : 'lazy'}
-      decoding="async"
-      className={`card-art w-full rounded-lg bg-ink object-cover ${owned ? '' : 'dim'} ${className}`}
-    />
-  );
-}
+export { CardArt } from './CardArt';
 
 export function Stat({
   label,

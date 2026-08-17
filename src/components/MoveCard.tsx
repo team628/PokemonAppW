@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { CardArt, Money, SourceNote } from './ui';
+import { Money, SourceNote } from './ui';
+import { CardArt } from './CardArt';
 import type { Move } from '@/lib/domain/nextBestMove';
 import { VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
 
@@ -43,7 +44,7 @@ export function MoveCard({ move, primary = false }: { move: Move; primary?: bool
         <ul className="rail mt-3 flex gap-2 overflow-x-auto pb-1">
           {move.evidence.map((e) => (
             <li key={`${e.cardId}-${e.variant}`} className="w-[64px] shrink-0">
-              <CardArt src={e.imageSmall} alt={e.name} />
+              <CardArt src={e.imageSmall} alt={e.name} label={`#${e.number}`} />
               <p className="num mt-1 truncate text-[10px] text-ink-mute">
                 #{e.number}
                 {e.variant !== 'normal' && ` ${VARIANT_SHORT[e.variant as Variant] ?? ''}`}

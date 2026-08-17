@@ -47,7 +47,7 @@ export default async function TradePage() {
                   {mutual.map((t) => (
                     <li key={`${t.cardId}-${t.variant}-${t.counterpartHandle}`} className="panel flex items-center gap-3 p-2.5">
                       <div className="w-[48px] shrink-0">
-                        <CardArt src={t.imageSmall} alt={t.name} />
+                        <CardArt src={t.imageSmall} alt={t.name} label={`#${t.number}`} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{t.name}</p>
@@ -80,7 +80,7 @@ export default async function TradePage() {
                   {oneWay.slice(0, 30).map((t) => (
                     <li key={`${t.cardId}-${t.variant}-${t.counterpartHandle}`} className="panel flex items-center gap-3 p-2.5">
                       <div className="w-[48px] shrink-0">
-                        <CardArt src={t.imageSmall} alt={t.name} />
+                        <CardArt src={t.imageSmall} alt={t.name} label={`#${t.number}`} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{t.name}</p>
@@ -117,7 +117,7 @@ export default async function TradePage() {
               {spares.slice(0, 30).map((s) => (
                 <li key={s.itemId} className="panel flex items-center gap-3 p-2.5">
                   <div className="w-[48px] shrink-0">
-                    <CardArt src={s.imageSmall} alt={s.name} />
+                    <CardArt src={s.imageSmall} alt={s.name} label={`#${s.number}`} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{s.name}</p>

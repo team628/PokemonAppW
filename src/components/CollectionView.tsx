@@ -5,7 +5,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { money } from '@/lib/pricing/quote';
 import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
 import { CONDITION_LABEL, type Condition } from '@/lib/domain/conditions';
-import { CardArt } from './ui';
+import { CardArt } from './CardArt';
 
 export interface HoldingView {
   id: string;
@@ -181,7 +181,7 @@ export function CollectionView({
           {visible.map((h) => (
             <li key={h.id} className="panel flex items-center gap-3 p-2.5">
               <Link href={`/app/cards/${h.cardId}`} className="w-[48px] shrink-0">
-                <CardArt src={h.imageSmall} alt={h.name} />
+                <CardArt src={h.imageSmall} alt={h.name} label={`#${h.number}`} />
               </Link>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{h.name}</p>

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { money } from '@/lib/pricing/quote';
 import type { Variant } from '@/lib/catalog/variants';
-import { CardArt } from './ui';
+import { CardArt } from './CardArt';
 
 export interface BinderSlot {
   cardId: string;
@@ -102,7 +102,7 @@ export function BinderPages({
               aria-label={`${s.name} number ${s.number}, ${s.owned ? 'in collection' : 'missing'}`}
             >
               <div className={`relative rounded-lg ${s.owned ? '' : 'ring-1 ring-inset ring-need/30'}`}>
-                <CardArt src={s.imageSmall} alt={s.name} owned={s.owned} />
+                <CardArt src={s.imageSmall} alt={s.name} owned={s.owned} label={`#${s.number}`} />
                 {!s.owned && (
                   <span className="absolute inset-x-0 bottom-1 mx-auto w-fit rounded bg-need px-1.5 py-0.5 text-[9px] font-black text-ink">
                     NEED

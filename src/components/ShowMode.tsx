@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { money } from '@/lib/pricing/quote';
 import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
-import { CardArt } from './ui';
+import { CardArt } from './CardArt';
 
 export interface PullSlot {
   cardId: string;
@@ -280,7 +280,7 @@ export function ShowMode({
             {slots.map((s) => (
               <li key={`${s.cardId}-${s.variant}`} className="panel flex items-center gap-3 p-2.5">
                 <div className="w-[52px] shrink-0">
-                  <CardArt src={s.imageSmall} alt={s.name} />
+                  <CardArt src={s.imageSmall} alt={s.name} label={`#${s.number}`} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{s.name}</p>
@@ -354,7 +354,7 @@ function PriceSheet({
       >
         <div className="flex items-center gap-3">
           <div className="w-14 shrink-0">
-            <CardArt src={slot.imageSmall} alt={slot.name} />
+            <CardArt src={slot.imageSmall} alt={slot.name} label={`#${slot.number}`} />
           </div>
           <div className="min-w-0">
             <p className="truncate font-bold">{slot.name}</p>
@@ -472,7 +472,7 @@ function Lookup({
         {hits.map((h) => (
           <li key={h.id} className="panel flex items-center gap-3 p-2.5">
             <div className="w-[52px] shrink-0">
-              <CardArt src={h.image_small} alt={h.name} />
+              <CardArt src={h.image_small} alt={h.name} label={`#${h.number}`} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{h.name}</p>

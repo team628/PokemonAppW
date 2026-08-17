@@ -170,7 +170,7 @@ export default async function PublicCollection({
           <ul className="rail flex gap-2 overflow-x-auto pb-1">
             {headline.metrics.missing.slice(0, 20).map((m) => (
               <li key={`${m.cardId}-${m.variant}`} className="w-[74px] shrink-0">
-                <CardArt src={m.imageSmall} alt={m.name} owned={false} />
+                <CardArt src={m.imageSmall} alt={m.name} owned={false} label={`#${m.number}`} />
                 <p className="num mt-1 truncate text-center text-[10px] text-ink-mute">#{m.number}</p>
               </li>
             ))}

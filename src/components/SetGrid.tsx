@@ -5,7 +5,7 @@ import { useMemo, useOptimistic, useState, useTransition } from 'react';
 import { money } from '@/lib/pricing/quote';
 import { VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
-import { CardArt } from './ui';
+import { CardArt } from './CardArt';
 
 export interface GridSlot {
   cardId: string;
@@ -199,7 +199,7 @@ export function SetGrid({
                   s.owned ? '' : 'opacity-95'
                 }`}
               >
-                <CardArt src={s.imageSmall} alt={s.name} owned={s.owned} />
+                <CardArt src={s.imageSmall} alt={s.name} owned={s.owned} label={`#${s.number}`} />
                 {s.owned && (
                   <span
                     aria-hidden
