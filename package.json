@@ -2,7 +2,7 @@
   "name": "setvalue",
   "version": "0.1.0",
   "private": true,
-  "description": "SetValue \u2014 the Pokemon collector operating system",
+  "description": "SetValue — the Pokemon collector operating system",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -18,8 +18,11 @@
     "test:e2e": "node tests/e2e/flow.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.112.3",
     "better-sqlite3": "^13.0.3",
     "next": "^15.5.23",
+    "pg": "^8.23.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.4.3"
@@ -27,6 +30,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.2.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "autoprefixer": "^10.5.4",
