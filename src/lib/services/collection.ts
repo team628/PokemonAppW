@@ -157,7 +157,7 @@ export function updateItem(
   userId: string,
   itemId: string,
   patch: { quantity?: number; condition?: Condition; paidCents?: number | null; acquiredOn?: string | null; forTrade?: boolean },
-): void {
+): boolean {
   const fields: string[] = [];
   const values: unknown[] = [];
   if (patch.quantity !== undefined) { fields.push('quantity = ?'); values.push(Math.max(0, patch.quantity)); }
@@ -165,11 +165,16 @@ export function updateItem(
   if (patch.paidCents !== undefined) { fields.push('paid_cents = ?'); values.push(patch.paidCents); }
   if (patch.acquiredOn !== undefined) { fields.push('acquired_on = ?'); values.push(patch.acquiredOn); }
   if (patch.forTrade !== undefined) { fields.push('for_trade = ?'); values.push(patch.forTrade ? 1 : 0); }
-  if (!fields.length) return;
+  if (!fields.length) return false;
   fields.push('updated_at = ?');
   values.push(nowIso(), itemId, userId);
-  db.prepare(`UPDATE collection_items SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`).run(...values);
+  // Scoped by user_id, so another collector's row simply matches nothing. The
+  // caller is told it matched nothing rather than being handed a false success.
+  const result = db
+    .prepare(`UPDATE collection_items SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`)
+    .run(...values);
   db.prepare('DELETE FROM collection_items WHERE id = ? AND user_id = ? AND quantity <= 0').run(itemId, userId);
+  return result.changes > 0;
 }
 
 // ------------------------------------------------------------- portfolio ----

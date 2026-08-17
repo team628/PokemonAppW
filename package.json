@@ -2,7 +2,7 @@
   "name": "setvalue",
   "version": "0.1.0",
   "private": true,
-  "description": "SetValue — the Pokemon collector operating system",
+  "description": "SetValue \u2014 the Pokemon collector operating system",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -10,10 +10,12 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:migrate": "tsx scripts/migrate.ts",
     "ingest:catalog": "tsx scripts/ingest-catalog.ts",
     "ingest:prices": "tsx scripts/ingest-prices.ts",
-    "seed:demo": "tsx scripts/seed-demo.ts"
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "setup": "node scripts/fetch-catalog.mjs && node scripts/fetch-prices.mjs && tsx scripts/ingest-catalog.ts && tsx scripts/ingest-prices.ts",
+    "snapshot:prices": "./scripts/snapshot-prices.sh",
+    "test:e2e": "node tests/e2e/flow.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

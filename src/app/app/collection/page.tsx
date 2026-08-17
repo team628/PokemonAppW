@@ -1,6 +1,7 @@
 import { requireUser } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { listHoldings, portfolioSummary } from '@/lib/services/collection';
+import Link from 'next/link';
 import { TopBar } from '@/components/AppShell';
 import { CollectionView, type HoldingView } from '@/components/CollectionView';
 import { SourceNote } from '@/components/ui';
@@ -48,7 +49,19 @@ export default async function CollectionPage({
         subtitle={`${summary.totalCards.toLocaleString()} cards · ${money(summary.valueCents)} · ${summary.setsTouched} sets`}
       />
       <main className="px-4 pb-8 pt-4">
+        {holdings.length === 0 && (
+          <Link href="/app/import" className="panel mb-3 block px-4 py-3.5">
+            <p className="text-sm font-semibold">Already track your collection somewhere else?</p>
+            <p className="mt-0.5 text-[13px] text-ink-mute">
+              Import a CSV and every set you are chasing updates at once.
+            </p>
+          </Link>
+        )}
         <CollectionView holdings={holdings} view={view} />
+        <Link href="/app/import" className="btn-ghost mt-4 w-full">
+          Import from CSV
+        </Link>
+
         <SourceNote className="mt-6 border-t border-ink-line pt-4">
           Values are TCGplayer USD market prices for the exact printing you own, discounted for
           condition below Near Mint (LP 85%, MP 70%, HP 50%, DMG 30% — trade-in bands, not quoted

@@ -13,7 +13,8 @@ const patch = z.object({
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   return withUser(async ({ user, db }) => {
-    updateItem(db, user.id, id, patch.parse(await req.json()));
+    const changed = updateItem(db, user.id, id, patch.parse(await req.json()));
+    if (!changed) throw new Error('No such item in your collection.');
     return { ok: true };
   });
 }

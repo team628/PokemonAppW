@@ -455,10 +455,15 @@ function Lookup({
         autoFocus
         className="field text-lg"
       />
-      <p className="mt-2 text-[11px] text-ink-mute">
+      <p className="mt-2 text-[11px] leading-relaxed text-ink-mute">
         {setId
           ? 'Type the number printed on the card — 4, 25, 151 — for an exact hit.'
-          : 'Searching every English set. Choose a set above to search by card number instead.'}
+          : 'Searching every English set. Choose a set above to search by card number instead.'}{' '}
+        <span className="text-ink-mute/80">
+          Photo recognition is not available in this build, so SetValue does not offer a
+          scan button it cannot stand behind. Set plus number is the fastest identification
+          it can make exactly.
+        </span>
       </p>
 
       {loading && <p className="mt-4 text-xs text-ink-mute">Searching…</p>}
