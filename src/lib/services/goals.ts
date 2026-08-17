@@ -1,4 +1,4 @@
-import { getDb, newId, nowIso, type DB } from '../db';
+import { newId, nowIso, type DB } from '../db';
 import { primaryVariantMap, setRequirements, getSet, type SetRow } from '../repo/catalog';
 import {
   computeGoal,
@@ -67,12 +67,6 @@ export function goalViews(db: DB, userId: string): GoalView[] {
       return { goal, set, metrics: metricsForSet(db, userId, goal.set_id, goal.mode) };
     })
     .filter((v): v is GoalView => v !== null);
-}
-
-export function getGoal(db: DB, userId: string, goalId: string): GoalRow | undefined {
-  return db
-    .prepare('SELECT * FROM set_goals WHERE id = ? AND user_id = ?')
-    .get(goalId, userId) as GoalRow | undefined;
 }
 
 export function addGoal(db: DB, userId: string, setId: string, mode: GoalMode): GoalRow {
@@ -206,8 +200,4 @@ export function logEvent(
     opts.payload === undefined ? null : JSON.stringify(opts.payload),
     nowIso(),
   );
-}
-
-export function db(): DB {
-  return getDb();
 }

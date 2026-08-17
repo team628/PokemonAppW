@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { money, pct } from '@/lib/pricing/quote';
+import { money } from '@/lib/pricing/quote';
 
 export function Money({
   cents,
@@ -43,10 +43,6 @@ export function Progress({
       />
     </div>
   );
-}
-
-export function Pct({ value, digits = 1 }: { value: number; digits?: number }) {
-  return <span className="num">{pct(value, digits)}</span>;
 }
 
 /**
@@ -103,24 +99,3 @@ export function SectionTitle({
 }
 
 export { CardArt } from './CardArt';
-
-export function Stat({
-  label,
-  value,
-  sub,
-  tone = 'default',
-}: {
-  label: string;
-  value: React.ReactNode;
-  sub?: React.ReactNode;
-  tone?: 'default' | 'have' | 'need';
-}) {
-  const color = tone === 'have' ? 'text-have' : tone === 'need' ? 'text-need' : 'text-white';
-  return (
-    <div className="panel px-4 py-3">
-      <p className="label">{label}</p>
-      <p className={`num mt-1 text-xl font-bold ${color}`}>{value}</p>
-      {sub && <p className="mt-0.5 text-[11px] text-ink-mute">{sub}</p>}
-    </div>
-  );
-}

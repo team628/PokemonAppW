@@ -144,33 +144,6 @@ export function sessionSummary(db: DB, userId: string, sessionId: string): Sessi
   };
 }
 
-export interface FindRow {
-  id: string;
-  card_id: string;
-  variant: string;
-  paid_cents: number | null;
-  market_cents: number | null;
-  found_at: string;
-  name: string;
-  number: string;
-  image_small: string | null;
-  set_name: string;
-}
-
-export function sessionFinds(db: DB, userId: string, sessionId: string): FindRow[] {
-  return db
-    .prepare(
-      `SELECT f.*, c.name, c.number, c.image_small, s.name AS set_name
-       FROM show_finds f
-       JOIN show_sessions ss ON ss.id = f.session_id AND ss.user_id = ?
-       JOIN cards c ON c.id = f.card_id
-       JOIN sets s ON s.id = c.set_id
-       WHERE f.session_id = ?
-       ORDER BY f.found_at DESC`,
-    )
-    .all(userId, sessionId) as FindRow[];
-}
-
 export function listSessions(db: DB, userId: string, limit = 20): (ShowSession & SessionSummary)[] {
   const sessions = db
     .prepare('SELECT * FROM show_sessions WHERE user_id = ? ORDER BY started_at DESC LIMIT ?')

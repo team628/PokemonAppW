@@ -97,7 +97,24 @@ export interface RawReqRow {
   observed_on: string | null;
 }
 
-/** Applies the market → mid → low ladder, keeping the basis that won. */
+/**
+ * Applies the market → mid → low ladder, keeping the basis that won.
+ *
+ * This is where SetValue's valuation policy is enforced, and it turns on three
+ * rules:
+ *
+ *  1. **One currency per number.** Set and portfolio totals are USD from
+ *     TCGplayer only. Cardmarket figures are EUR and appear as a secondary
+ *     reference on a card, never silently converted — there is no FX feed here,
+ *     and inventing a rate would quietly corrupt every total in the product.
+ *  2. **Explicit basis.** `market` is transaction-derived; `mid` and `low` are
+ *     listing-derived. Which one produced a figure travels with it, so the UI
+ *     can soften the claim rather than presenting a listing as a sale.
+ *  3. **Absence is a value.** A slot with no quote is not worth $0, it is
+ *     unpriced — hence `null` rather than `0`. Unpriced slots are counted
+ *     separately downstream, which is what makes NEED a floor rather than a
+ *     fiction.
+ */
 export function toRequirement(r: RawReqRow): Requirement {
   let marketCents: number | null = null;
   let basis: Requirement['basis'] = null;

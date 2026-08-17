@@ -146,12 +146,6 @@ export function removeFromCollection(
   return { remaining, setId };
 }
 
-export function setForTrade(db: DB, userId: string, itemId: string, forTrade: boolean): void {
-  db.prepare('UPDATE collection_items SET for_trade = ?, updated_at = ? WHERE id = ? AND user_id = ?').run(
-    forTrade ? 1 : 0, nowIso(), itemId, userId,
-  );
-}
-
 export function updateItem(
   db: DB,
   userId: string,
