@@ -5,6 +5,7 @@
  * Deterministic: the same cards are owned on every run, so screenshots and
  * manual checks are reproducible. Nothing here is used by the app at runtime.
  */
+import { randomBytes } from 'node:crypto';
 import { openDb, nowIso } from '../src/lib/db/index';
 import { createUser } from '../src/lib/auth';
 import { addToCollection } from '../src/lib/services/collection';
@@ -59,6 +60,16 @@ function fill(
 }
 
 function main() {
+  // A demo account with a published password is an open door if this ever runs
+  // against a real deployment.
+  if (process.env.NODE_ENV === 'production' && process.env.SETVALUE_ALLOW_DEMO_SEED !== 'yes') {
+    console.error(
+      'refusing to seed demo accounts with NODE_ENV=production.\n' +
+        'Set SETVALUE_ALLOW_DEMO_SEED=yes only if you genuinely want demo logins in production.',
+    );
+    process.exit(1);
+  }
+
   const db = openDb();
 
   if (db.prepare("SELECT 1 FROM users WHERE email = 'demo@setvalue.app'").get()) {
@@ -66,15 +77,19 @@ function main() {
     return;
   }
 
+  // Generated per run rather than baked into the repository, so a seeded
+  // instance never ships with a password that is public knowledge.
+  const password = process.env.SETVALUE_DEMO_PASSWORD ?? randomBytes(9).toString('base64url');
+
   const demo = createUser(db, {
     email: 'demo@setvalue.app',
-    password: 'setvalue-demo',
+    password,
     displayName: 'Riley',
     handle: 'riley',
   });
   const misty = createUser(db, {
     email: 'trader@setvalue.app',
-    password: 'setvalue-demo',
+    password,
     displayName: 'Kai',
     handle: 'kai',
   });
@@ -105,7 +120,8 @@ function main() {
   console.log(`kai:   ${listed.changes} duplicate stacks listed for trade`);
 
   db.close();
-  console.log('\ndemo sign-in: demo@setvalue.app / setvalue-demo');
+  console.log(`\ndemo sign-in: demo@setvalue.app / ${password}`);
+  console.log('(generated for this run — it is not stored anywhere else)');
 }
 
 main();

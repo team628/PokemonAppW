@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { AuthError, currentUser, type User } from './auth';
+import { RateLimitError } from './rateLimit';
 import { getDb, type DB } from './db';
 import { VARIANTS } from './catalog/variants';
 import { CONDITIONS } from './domain/conditions';
@@ -16,6 +17,12 @@ export async function withUser<T>(
     return NextResponse.json(data ?? { ok: true });
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: 401 });
+    if (e instanceof RateLimitError) {
+      return NextResponse.json(
+        { error: e.message },
+        { status: 429, headers: { 'Retry-After': String(e.retryAfterSeconds) } },
+      );
+    }
     if (e instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid request', issues: e.issues }, { status: 400 });
     }

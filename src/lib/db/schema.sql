@@ -116,7 +116,9 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   avatar_color  TEXT NOT NULL DEFAULT '#2DD4A7',
   created_at    TEXT NOT NULL,
-  share_public  INTEGER NOT NULL DEFAULT 1
+  -- Private by default. A collection's value is a theft risk, and publishing it
+  -- is a decision the collector makes, not one the product makes for them.
+  share_public  INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -126,6 +128,31 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+-- Replay guard for Card Show finds. Durable rather than in-process, so a
+-- restart or a second instance cannot turn one card into two.
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  key        TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, key)
+);
+CREATE INDEX IF NOT EXISTS idx_idem_created ON idempotency_keys(created_at);
+
+-- Fixed-window counters. Durable so a restart cannot reset an attacker's budget
+-- and so limits hold across processes.
+CREATE TABLE IF NOT EXISTS rate_limits (
+  bucket       TEXT NOT NULL,
+  window_start INTEGER NOT NULL,
+  hits         INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (bucket, window_start)
+);
+CREATE INDEX IF NOT EXISTS idx_rate_window ON rate_limits(window_start);
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  id         TEXT PRIMARY KEY,
+  applied_at TEXT NOT NULL
+);
 
 -- ------------------------------------------------------------- collection ---
 
@@ -149,6 +176,9 @@ CREATE TABLE IF NOT EXISTS collection_items (
 CREATE INDEX IF NOT EXISTS idx_ci_user      ON collection_items(user_id);
 CREATE INDEX IF NOT EXISTS idx_ci_user_card ON collection_items(user_id, card_id);
 CREATE INDEX IF NOT EXISTS idx_ci_trade     ON collection_items(for_trade, card_id);
+-- Covers the ownership check inside the want-index aggregate, which runs once
+-- per (goal, printing) pair and is the hottest lookup in the product.
+CREATE INDEX IF NOT EXISTS idx_ci_slot      ON collection_items(user_id, card_id, variant);
 
 CREATE TABLE IF NOT EXISTS set_goals (
   id           TEXT PRIMARY KEY,
@@ -161,6 +191,7 @@ CREATE TABLE IF NOT EXISTS set_goals (
   UNIQUE (user_id, set_id, mode)
 );
 CREATE INDEX IF NOT EXISTS idx_goals_user ON set_goals(user_id);
+CREATE INDEX IF NOT EXISTS idx_goals_set  ON set_goals(set_id, mode);
 
 CREATE TABLE IF NOT EXISTS wishlist_items (
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -220,6 +251,31 @@ CREATE TABLE IF NOT EXISTS show_finds (
   found_at      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_finds_session ON show_finds(session_id, found_at DESC);
+
+-- Materialised want index: how many collectors are missing each printing.
+--
+-- Recomputing this from goals + collections costs roughly (goals x set size)
+-- row visits — measured at 8.7s for 5,000 collectors, which is unacceptable on
+-- a request path backed by a synchronous driver. It is refreshed on a timer in
+-- a worker thread and read instantly here, with `computed_at` surfaced so the
+-- staleness is visible rather than hidden.
+CREATE TABLE IF NOT EXISTS want_index (
+  card_id      TEXT NOT NULL,
+  variant      TEXT NOT NULL,
+  collectors   INTEGER NOT NULL,
+  market_cents INTEGER,
+  PRIMARY KEY (card_id, variant)
+);
+CREATE INDEX IF NOT EXISTS idx_want_rank ON want_index(collectors DESC);
+
+CREATE TABLE IF NOT EXISTS want_index_meta (
+  id          INTEGER PRIMARY KEY CHECK (id = 1),
+  computed_at TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  open_wants  INTEGER NOT NULL,
+  total_demand INTEGER NOT NULL,
+  demand_value_cents INTEGER NOT NULL
+);
 
 -- -------------------------------------------------------------- partners ----
 

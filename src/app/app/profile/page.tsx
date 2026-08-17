@@ -5,6 +5,7 @@ import { TopBar } from '@/components/AppShell';
 import { SectionTitle, SourceNote } from '@/components/ui';
 import { portfolioSummary } from '@/lib/services/collection';
 import { signOutAction } from '@/app/actions/auth';
+import { ShareToggle } from '@/components/ShareToggle';
 import { money } from '@/lib/pricing/quote';
 
 export const dynamic = 'force-dynamic';
@@ -58,13 +59,7 @@ export default async function ProfilePage() {
 
         <section>
           <SectionTitle>Share</SectionTitle>
-          <Link href={`/c/${user.handle}`} className="panel block px-4 py-3.5">
-            <p className="text-sm font-semibold">Your public collection page</p>
-            <p className="mt-0.5 break-all text-[11px] text-ink-mute">/c/{user.handle}</p>
-            <p className="mt-1.5 text-[11px] text-ink-mute">
-              Shows set progress and totals. Never shows what you paid, your email, or your address.
-            </p>
-          </Link>
+          <ShareToggle handle={user.handle} initial={user.share_public === 1} />
         </section>
 
         <section>

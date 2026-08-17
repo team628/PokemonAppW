@@ -34,9 +34,18 @@ interface QueuedFind {
   variant: Variant;
   paidCents: number | null;
   withMode: GoalMode;
+  name: string;
+  number: string;
 }
 
-const QUEUE_KEY = 'setvalue.show.queue.v1';
+interface RejectedFind extends QueuedFind {
+  reason: string;
+}
+
+type SendOutcome = 'sent' | 'retry' | 'rejected';
+
+const QUEUE_KEY = 'setvalue.show.queue.v2';
+const REJECT_KEY = 'setvalue.show.rejected.v1';
 
 /**
  * Card Show mode.
@@ -71,6 +80,7 @@ export function ShowMode({
   );
   const [tab, setTab] = useState<'pull' | 'lookup'>('pull');
   const [queue, setQueue] = useState<QueuedFind[]>([]);
+  const [rejected, setRejected] = useState<RejectedFind[]>([]);
   const [online, setOnline] = useState(true);
   const [flash, setFlash] = useState<{ name: string; saved: number | null } | null>(null);
   const [priceFor, setPriceFor] = useState<PullSlot | null>(null);
@@ -82,6 +92,8 @@ export function ShowMode({
     try {
       const raw = localStorage.getItem(QUEUE_KEY);
       if (raw) setQueue(JSON.parse(raw));
+      const rej = localStorage.getItem(REJECT_KEY);
+      if (rej) setRejected(JSON.parse(rej));
     } catch {
       /* storage unavailable — mode still works, just without replay */
     }
@@ -105,10 +117,29 @@ export function ShowMode({
     }
   }, []);
 
+  const persistRejected = useCallback((r: RejectedFind[]) => {
+    setRejected(r);
+    try {
+      localStorage.setItem(REJECT_KEY, JSON.stringify(r));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  /**
+   * Sends one find.
+   *
+   * The distinction that matters: a network failure or a server fault is worth
+   * retrying, but a 4xx never becomes valid by being sent again. Retrying those
+   * forever left cards stuck in a queue under a banner promising they would
+   * sync — the worst possible failure for this screen, because the collector
+   * has already put the card in the box and moved on.
+   */
   const send = useCallback(
-    async (item: QueuedFind): Promise<boolean> => {
+    async (item: QueuedFind): Promise<SendOutcome> => {
+      let res: Response;
       try {
-        const res = await fetch('/api/show/find', {
+        res = await fetch('/api/show/find', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -120,30 +151,53 @@ export function ShowMode({
             idempotencyKey: item.key,
           }),
         });
-        if (!res.ok) return false;
-        const data = await res.json();
-        if (data.summary) setSummary(data.summary);
-        if (data.metrics && data.metrics.setId === setId) {
-          setNeedCents(data.metrics.needCents);
-          setMissingCount(data.metrics.missingCount);
-        }
-        return true;
       } catch {
-        return false;
+        return 'retry'; // offline or connection dropped
       }
+
+      if (res.status === 408 || res.status === 429 || res.status >= 500) return 'retry';
+
+      if (!res.ok) {
+        let reason = `Rejected (${res.status})`;
+        try {
+          const body = await res.json();
+          if (body?.error) reason = String(body.error);
+        } catch {
+          /* keep the status-code reason */
+        }
+        rejectedRef.current.push({ ...item, reason });
+        return 'rejected';
+      }
+
+      const data = await res.json();
+      if (data.summary) setSummary(data.summary);
+      if (data.metrics && data.metrics.setId === setId) {
+        setNeedCents(data.metrics.needCents);
+        setMissingCount(data.metrics.missingCount);
+      }
+      return 'sent';
     },
     [setId],
   );
 
   const flushRef = useRef(false);
+  const rejectedRef = useRef<RejectedFind[]>([]);
+
   const flush = useCallback(async () => {
     if (flushRef.current || !queue.length) return;
     flushRef.current = true;
+    rejectedRef.current = [];
     const remaining: QueuedFind[] = [];
-    for (const item of queue) if (!(await send(item))) remaining.push(item);
+    for (const item of queue) {
+      if ((await send(item)) === 'retry') remaining.push(item);
+    }
     persist(remaining);
+    if (rejectedRef.current.length) {
+      persistRejected([...rejected, ...rejectedRef.current]);
+      rejectedRef.current = [];
+    }
     flushRef.current = false;
-  }, [queue, send, persist]);
+  }, [queue, send, persist, persistRejected, rejected]);
 
   useEffect(() => {
     if (online && queue.length) void flush();
@@ -158,6 +212,8 @@ export function ShowMode({
       variant: slot.variant,
       paidCents,
       withMode: mode,
+      name: slot.name,
+      number: slot.number,
     };
 
     // Local truth updates first: the card is in your hand, the screen should
@@ -177,7 +233,25 @@ export function ShowMode({
     setTimeout(() => setFlash(null), 2200);
     setPriceFor(null);
 
-    if (!(await send(item))) persist([...queue, item]);
+    rejectedRef.current = [];
+    const outcome = await send(item);
+    if (outcome === 'retry') persist([...queue, item]);
+    if (outcome === 'rejected' && rejectedRef.current.length) {
+      // Put the card back on the pull list — it was never saved.
+      setSlots((prev) =>
+        [...prev, slot].sort((a, b) => Number(a.number) - Number(b.number) || a.number.localeCompare(b.number)),
+      );
+      setMissingCount((n) => n + 1);
+      setNeedCents((c) => c + (slot.marketCents ?? 0));
+      setSummary((s) => ({
+        finds: Math.max(0, s.finds - 1),
+        spentCents: Math.max(0, s.spentCents - (paidCents ?? 0)),
+        marketCents: Math.max(0, s.marketCents - (slot.marketCents ?? 0)),
+      }));
+      setFlash(null);
+      persistRejected([...rejected, ...rejectedRef.current]);
+      rejectedRef.current = [];
+    }
   }
 
   const listValue = useMemo(
@@ -209,6 +283,29 @@ export function ShowMode({
               ? `Syncing ${queue.length} find${queue.length === 1 ? '' : 's'}…`
               : `Offline — ${queue.length} find${queue.length === 1 ? '' : 's'} saved on this device and will sync automatically.`}
           </p>
+        )}
+        {rejected.length > 0 && (
+          <div className="mt-2 rounded-lg border border-need/40 bg-need/10 px-2.5 py-2">
+            <p className="text-[11px] font-bold text-need">
+              {rejected.length} find{rejected.length === 1 ? ' was' : 's were'} not saved
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {rejected.slice(0, 4).map((r) => (
+                <li key={r.key} className="text-[11px] text-need/90">
+                  {r.name} #{r.number} — {r.reason}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-[10px] text-need/80">
+              These are back on the pull list. Retrying would not have helped.
+            </p>
+            <button
+              onClick={() => persistRejected([])}
+              className="mt-1.5 text-[11px] font-semibold text-need underline"
+            >
+              Dismiss
+            </button>
+          </div>
         )}
       </div>
 

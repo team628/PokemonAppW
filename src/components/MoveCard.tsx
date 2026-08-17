@@ -33,7 +33,14 @@ export function MoveCard({ move, primary = false }: { move: Move; primary?: bool
           {KIND_LABEL[move.kind]}
         </span>
         {move.costCents !== null && (
-          <Money cents={move.costCents} approx className="text-sm font-bold" />
+          <span className="text-right">
+            <Money cents={move.costCents} approx className="block text-sm font-bold" />
+            {move.listingCount !== undefined && move.listingCount > 1 && (
+              <span className="num block text-[10px] text-ink-mute">
+                {move.listingCount} listings
+              </span>
+            )}
+          </span>
         )}
       </div>
 

@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { getDb } from '@/lib/db';
-import { demandReport } from '@/lib/services/demand';
+import { demandReport, type DemandRow } from '@/lib/services/demand';
+import { ensureWantIndexFresh } from '@/lib/services/wantIndexScheduler';
+import { headers } from 'next/headers';
+import { RULES, checkLimit } from '@/lib/rateLimit';
 import { money } from '@/lib/pricing/quote';
 import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
 import { CardArt } from '@/components/ui';
@@ -34,11 +37,34 @@ export default async function PartnersPage({
   const sp = await searchParams;
   const db = getDb();
 
-  const demand = demandReport(db, { limit: 60, setId: sp.set });
+  // This page is public. It now reads a materialised snapshot rather than
+  // recomputing, but a per-address cap keeps anonymous traffic from turning any
+  // future regression here into an outage for signed-in collectors.
+  const h = await headers();
+  const addr = (h.get('x-forwarded-for')?.split(',')[0] ?? h.get('x-real-ip') ?? 'unknown').trim();
+  const gate = checkLimit(db, `partners:${addr}`, RULES.publicPage);
+  if (!gate.allowed) {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 text-center">
+        <p className="text-lg font-bold">Slow down a moment</p>
+        <p className="mt-2 text-sm text-ink-mute">
+          This page is rate limited. Try again in {gate.retryAfterSeconds}s.
+        </p>
+      </main>
+    );
+  }
+
+  // Non-blocking: kicks a worker-thread rebuild if the index has gone stale and
+  // returns whatever snapshot exists. No request ever waits for the aggregate.
+  ensureWantIndexFresh();
+
+  const report = demandReport(db, { limit: 60, setId: sp.set });
+  const demand: DemandRow[] = report.rows;
   const collectors = (db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n;
   const tracked = (db.prepare('SELECT COUNT(*) AS n FROM set_goals').get() as { n: number }).n;
-  const totalDemand = demand.reduce((s, d) => s + d.collectors, 0);
-  const demandValue = demand.reduce((s, d) => s + d.collectors * (d.marketCents ?? 0), 0);
+  const ageSeconds = report.computedAt
+    ? Math.round((Date.now() - Date.parse(report.computedAt)) / 1000)
+    : null;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-5 pb-16">
@@ -63,12 +89,24 @@ export default async function PartnersPage({
       <section className="panel mt-7 grid grid-cols-2 gap-px overflow-hidden bg-ink-line sm:grid-cols-4">
         <Cell label="Collectors" value={collectors.toLocaleString()} />
         <Cell label="Sets being chased" value={tracked.toLocaleString()} />
-        <Cell label="Open card wants" value={totalDemand.toLocaleString()} />
-        <Cell label="Want value" value={money(demandValue)} />
+        <Cell label="Open card wants" value={report.totalDemand.toLocaleString()} />
+        <Cell label="Want value" value={money(report.demandValueCents)} />
       </section>
 
       <section className="mt-10">
         <h2 className="label">Live demand — what collectors are missing right now</h2>
+        <p className="mt-1.5 text-[11px] text-ink-mute">
+          {ageSeconds === null ? (
+            <>The demand index has not been built yet. It is being computed now; reload shortly.</>
+          ) : (
+            <>
+              {report.openWants.toLocaleString()} distinct printings have at least one collector
+              waiting; the {demand.length} most wanted are shown. Snapshot taken{' '}
+              {ageSeconds < 60 ? `${ageSeconds}s` : `${Math.round(ageSeconds / 60)}m`} ago
+              {report.durationMs !== null && ` (rebuild took ${(report.durationMs / 1000).toFixed(1)}s)`}.
+            </>
+          )}
+        </p>
         {demand.length === 0 ? (
           <p className="panel mt-3 px-4 py-8 text-center text-sm text-ink-mute">
             No open wants yet. This table fills as collectors track sets.

@@ -21,12 +21,43 @@ declare global {
   var __setvalue_db: DB | undefined;
 }
 
+/**
+ * One-way data migrations.
+ *
+ * `schema.sql` is all CREATE ... IF NOT EXISTS, so it cannot change an existing
+ * column default or repair existing rows. Anything that must alter data already
+ * in the database goes here, runs once, and is recorded.
+ */
+const MIGRATIONS: { id: string; run: (db: DB) => void }[] = [
+  {
+    // Collections were public by default in the first release, and no setting
+    // existed to change that. Everyone is returned to private; sharing is now
+    // something a collector opts into.
+    id: '001-collections-private-by-default',
+    run: (db) => db.prepare('UPDATE users SET share_public = 0').run(),
+  },
+];
+
+function migrate(db: DB): void {
+  const applied = new Set(
+    (db.prepare('SELECT id FROM schema_migrations').all() as { id: string }[]).map((r) => r.id),
+  );
+  for (const m of MIGRATIONS) {
+    if (applied.has(m.id)) continue;
+    db.transaction(() => {
+      m.run(db);
+      db.prepare('INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)').run(m.id, nowIso());
+    })();
+  }
+}
+
 function open(): DB {
   const db = new Database(DB_PATH);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
   db.exec(readFileSync(SCHEMA_PATH, 'utf8'));
+  migrate(db);
   return db;
 }
 
@@ -40,7 +71,9 @@ export function openDb(file?: string): DB {
   const db = new Database(file ?? DB_PATH);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 5000');
   db.exec(readFileSync(SCHEMA_PATH, 'utf8'));
+  migrate(db);
   return db;
 }
 

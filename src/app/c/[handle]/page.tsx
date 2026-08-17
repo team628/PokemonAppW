@@ -32,7 +32,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { handle } = await params;
   const user = load(handle);
-  if (!user || user.share_public !== 1) return { title: 'SetValue' };
+  if (!user || user.share_public !== 1) return { title: 'Not found — SetValue' };
   const views = goalViews(getDb(), user.id);
   const best = [...views].sort((a, b) => b.metrics.percent - a.metrics.percent)[0];
   return {
@@ -57,16 +57,10 @@ export default async function PublicCollection({
 }) {
   const { handle } = await params;
   const user = load(handle);
-  if (!user) notFound();
-
-  if (user.share_public !== 1) {
-    return (
-      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 text-center">
-        <p className="text-lg font-bold">This collection is private</p>
-        <p className="mt-2 text-sm text-ink-mute">@{handle} has not made their page public.</p>
-      </main>
-    );
-  }
+  // A private collection is indistinguishable from one that does not exist.
+  // Rendering a "this is private" page would confirm the handle is taken and
+  // let anyone enumerate which collectors are on SetValue.
+  if (!user || user.share_public !== 1) notFound();
 
   const db = getDb();
   const views = goalViews(db, user.id).sort((a, b) => b.metrics.percent - a.metrics.percent);

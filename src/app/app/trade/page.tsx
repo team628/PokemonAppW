@@ -16,9 +16,15 @@ export default async function TradePage() {
 
   const { trades, views } = buildInsights(db, user.id);
   const spares = demandForSpares(db, user.id);
-  const mutual = trades.filter((t) => t.mutual);
-  const oneWay = trades.filter((t) => !t.mutual);
+  const allMutual = trades.filter((t) => t.mutual);
+  const allOneWay = trades.filter((t) => !t.mutual);
   const wanted = spares.filter((s) => s.wantedBy > 0);
+
+  // Both lists are capped. Rendering every match produced a 19 MB page at 5,000
+  // collectors — on a phone, on a show floor.
+  const LIST_CAP = 40;
+  const mutual = allMutual.slice(0, LIST_CAP);
+  const oneWay = allOneWay.slice(0, LIST_CAP);
 
   return (
     <>
@@ -36,7 +42,17 @@ export default async function TradePage() {
         ) : (
           <>
             <section>
-              <SectionTitle>Both ways</SectionTitle>
+              <SectionTitle
+                action={
+                  allMutual.length > mutual.length ? (
+                    <span className="num text-xs text-ink-mute">
+                      showing {mutual.length} of {allMutual.length}
+                    </span>
+                  ) : undefined
+                }
+              >
+                Both ways
+              </SectionTitle>
               {mutual.length === 0 ? (
                 <p className="panel px-4 py-6 text-center text-sm text-ink-mute">
                   No two-way matches right now. These appear when another collector has a spare you
@@ -75,9 +91,19 @@ export default async function TradePage() {
 
             {oneWay.length > 0 && (
               <section>
-                <SectionTitle>They have what you need</SectionTitle>
+                <SectionTitle
+                  action={
+                    allOneWay.length > oneWay.length ? (
+                      <span className="num text-xs text-ink-mute">
+                        showing {oneWay.length} of {allOneWay.length}
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  They have what you need
+                </SectionTitle>
                 <ul className="space-y-2">
-                  {oneWay.slice(0, 30).map((t) => (
+                  {oneWay.map((t) => (
                     <li key={`${t.cardId}-${t.variant}-${t.counterpartHandle}`} className="panel flex items-center gap-3 p-2.5">
                       <div className="w-[48px] shrink-0">
                         <CardArt src={t.imageSmall} alt={t.name} label={`#${t.number}`} />
@@ -114,7 +140,7 @@ export default async function TradePage() {
             </p>
           ) : (
             <ul className="space-y-2">
-              {spares.slice(0, 30).map((s) => (
+              {spares.slice(0, 50).map((s) => (
                 <li key={s.itemId} className="panel flex items-center gap-3 p-2.5">
                   <div className="w-[48px] shrink-0">
                     <CardArt src={s.imageSmall} alt={s.name} label={`#${s.number}`} />

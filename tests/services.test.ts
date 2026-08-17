@@ -8,6 +8,7 @@ import { addToCollection, removeFromCollection, listHoldings, portfolioSummary, 
 import { addGoal, metricsForSet, unseenMilestones, markMilestonesSeen, goalViews } from '@/lib/services/goals';
 import { buildInsights, duplicates, tradeMatches } from '@/lib/services/insights';
 import { demandForSpares, demandReport } from '@/lib/services/demand';
+import { refreshWantIndex } from '@/lib/services/wantIndexRefresh';
 import { startSession, recordFind, sessionSummary, endSession } from '@/lib/services/show';
 
 /**
@@ -348,7 +349,8 @@ describe('trade matching', () => {
     addGoal(db, b.id, 'tst', 'main');
     addToCollection(db, a.id, { cardId: 'tst-3', variant: 'holofoil' });
 
-    const report = demandReport(db, { limit: 10 });
+    refreshWantIndex(db);
+    const report = demandReport(db, { limit: 10 }).rows;
     const holo = report.find((r) => r.cardId === 'tst-3')!;
     expect(holo.collectors).toBe(1); // only B still needs it
     const common = report.find((r) => r.cardId === 'tst-1')!;

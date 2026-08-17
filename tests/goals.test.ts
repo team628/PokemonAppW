@@ -156,6 +156,23 @@ describe('milestonesFor', () => {
     expect(milestonesFor(make(0, 100))).toEqual([]);
   });
 
+  it('never congratulates a collector for starting a small set', () => {
+    // A five-card set is entirely "missing" the moment it is tracked. Saying
+    // "final five, every one counts now" there is a celebration of nothing.
+    expect(milestonesFor(make(0, 5))).toEqual([]);
+    expect(milestonesFor(make(0, 1))).toEqual([]);
+  });
+
+  it('does not call a five-card set the "final five", but does call one card "one left"', () => {
+    // On a five-card set the whole thing is the final five from the start, so
+    // that milestone is meaningless. "One left" stays: with four of five owned,
+    // a single card really does stand between the collector and a finished set.
+    const small = milestonesFor(make(4, 5));
+    expect(small).not.toContain('final_five');
+    expect(small).toContain('one_left');
+    expect(small).toContain('started');
+  });
+
   it('fires started on the first card', () => {
     expect(milestonesFor(make(1, 100))).toEqual(['started']);
   });

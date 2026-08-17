@@ -17,12 +17,19 @@ npm run seed:demo  # optional: two demo collectors with real holdings
 npm run build && npm start
 ```
 
-Demo sign-in: `demo@setvalue.app` / `setvalue-demo`
+`npm run seed:demo` prints a freshly generated password for the demo accounts — it is not
+stored in this repository, and the script refuses to run under `NODE_ENV=production` unless
+explicitly overridden.
 
 ```bash
-npm test           # 120 unit, service and data-integrity tests
-npm run test:e2e   # 29-check browser run against a server on :3000
+npm test           # 151 unit, service, parity and data-integrity tests
+npm run test:e2e   # 36-check browser run against a server on :3000
 npm run typecheck
+
+# load / DoS measurements (writes to a scratch database, never data/setvalue.db)
+npx tsx tests/load/generate.ts 5000
+SETVALUE_DB=/tmp/setvalue-load.db npx next start -p 3100
+node tests/load/measure.mjs http://localhost:3100 <sessionToken> "label"
 ```
 
 ---
@@ -56,6 +63,7 @@ This distinction is the product. Every screen keeps it visible.
 | **Known** | A provider quoted this printing on a stated date | Plain figure, with the date available |
 | **Estimated** | Derived from listings rather than sales, or adjusted for condition | Labelled "estimate"; move cards carry `confidence: estimated` |
 | **Unknown** | No provider covers this printing | Shown as `—`, excluded from totals, and NEED is labelled a **floor** |
+| **Refused** | Graded cards | Held and counted toward completion, shown as "graded — not valued" |
 
 Concretely:
 
@@ -69,6 +77,13 @@ Concretely:
 - **Price-change alerts stay switched off** until two readings of the *same*
   printing exist. One data point is not a trend. Run `npm run snapshot:prices`
   daily and change tracking switches itself on.
+- **Graded cards are not valued.** A PSA 10 and a raw copy are different objects to the
+  market, routinely by one or two orders of magnitude, and SetValue has no graded price
+  source. Slabs are held, counted toward set completion, and reported as unvalued —
+  quoting the raw price for them would be a fabricated number dressed as a real one.
+- **Bulk suggestions quote card prices only.** "141 cards for $6.95" is 141 separate
+  listings from up to 141 sellers; SetValue has no shipping data and will not invent a
+  per-order figure, so it states the listing count instead of implying a total outlay.
 
 ---
 
@@ -141,13 +156,40 @@ dependency.
 
 ### Scale notes
 
-- The want index (`src/lib/services/demand.ts`) currently walks every tracked goal
-  per call. Correct and cheap at single-instance size; the shape it becomes is a
-  `want_index` table maintained on collection and goal writes. Every consumer reads
-  through one function, so that change stays local to that file.
+Measured, not assumed. With 5,010 collectors, 9,000 goals and 1.02M collection rows:
+
+| | before hardening | after |
+|---|---|---|
+| `/partners` (public) | 15,404 ms | **160 ms** |
+| `/app` (dashboard) | 8,735 ms | **499 ms** |
+| `/app/trade` | 27,456 ms / 19 MB | **444 ms / 70 KB** |
+| `/app/collection` (15k-card collector) | 1,523 ms / 17 MB | **170 ms / 122 KB** |
+| `/signin` under 5 concurrent public requests | 78,494 ms | **7 ms** |
+
+- **better-sqlite3 is synchronous**, so any multi-second query stalls every request on the
+  process, not just its own. That is why a public page doing an O(users) aggregate was a
+  denial-of-service vector rather than merely a slow page.
+- The want index is **materialised** into `want_index` and rebuilt on a worker thread
+  (`wantIndexWorker.mjs`) on a 5-minute staleness check. No request ever waits for it; the
+  snapshot's age is displayed rather than hidden. `tests/demand-parity.test.ts` asserts the
+  aggregate agrees exactly with the per-user domain engine it replaced.
+- Collection and trade lists page in SQL, so payload is flat regardless of collection size.
+- Bulk import defers milestone recomputation to one pass per set: 2.4 ms/row → 0.13 ms/row,
+  turning a ~48 s server freeze on a 20,000-row import into ~2.7 s.
 - Card art is served straight from the provider CDN rather than proxied, so the app
   server never becomes a bottleneck on a 360-card set page.
 - First-load JS is 103–112 kB across every route.
+
+### Abuse resistance
+
+- Rate limits are stored in the database (`rate_limits`), not process memory, so a restart
+  does not hand out a fresh budget and limits hold across instances. Sign-in is capped per
+  account *and* per address, sign-up and bulk import per account/address.
+- Card Show replay keys live in `idempotency_keys` for the same reason: an in-memory guard
+  re-armed on every deploy, so a queue replayed after a restart double-counted cards.
+- `x-forwarded-for` is client-controlled, so address-based limits are a speed bump against
+  casual abuse, not a defence against a determined attacker with many addresses. Real
+  protection belongs at the edge.
 
 ---
 
@@ -259,6 +301,11 @@ no partner API keys are issued in this environment, so no real shop inventory is
 
 **English sets only.** The catalog covers the English releases; Japanese sets are not
 ingested.
+
+**No graded price source.** Graded cards are deliberately unvalued rather than
+approximated. Wiring in a graded price feed is the fix; guessing is not.
+
+**No password reset or email verification.** Accounts are email + password only.
 
 **Single-node SQLite.** Correct and fast for the sizes this runs at. See *Scale notes*
 for what changes and where.

@@ -157,18 +157,56 @@ try {
   check('journey records the tracked set', journey.includes('Started chasing'));
 
   // ---------------------------------------------------------- public sharing
-  console.log('\nsharing');
+  console.log('\nsharing (opt-in)');
   await page.goto(`${BASE}/app/profile`);
+  const profile = await page.locator('main').innerText();
+  check('sharing is off by default', /Off\. Nobody can see your collection/.test(profile));
+  check('no share link is shown while private', !/\/c\//.test(profile));
+
+  const toggle = page.locator('button[role="switch"]');
+  check('a sharing control exists', await toggle.isVisible());
+
+  // Private collections must be indistinguishable from missing ones.
+  const anon = await browser.newPage();
+  const privateResp = await anon.goto(`${BASE}/c/e2e_collector`);
+  check('private collection is not readable', (privateResp?.status() ?? 0) === 404);
+
+  await toggle.click();
+  await page.waitForTimeout(900);
   const handle = (await page.locator('main').innerText()).match(/\/c\/([a-z0-9_]+)/)?.[1];
-  check('profile exposes a share URL', !!handle);
+  check('opting in reveals the share URL', !!handle);
+
   if (handle) {
-    const anon = await browser.newPage();
-    await anon.goto(`${BASE}/c/${handle}`);
+    const resp = await anon.goto(`${BASE}/c/${handle}`);
+    check('public page renders once opted in', (resp?.status() ?? 0) === 200);
     const shared = await anon.locator('body').innerText();
-    check('public page renders without a session', shared.includes('Progress'));
+    check('public page shows progress', shared.includes('Progress'));
     check('public page hides purchase prices', !shared.toLowerCase().includes('paid'));
-    await anon.close();
+
+    // And opting back out must close it again.
+    await page.locator('button[role="switch"]').click();
+    await page.waitForTimeout(900);
+    const closed = await anon.goto(`${BASE}/c/${handle}`);
+    check('opting back out closes the page', (closed?.status() ?? 0) === 404);
   }
+  await anon.close();
+
+  // ------------------------------------------------------- sign-in throttle
+  console.log('\nsign-in throttle');
+  const attacker = await browser.newPage();
+  let throttled = false;
+  for (let i = 0; i < 13 && !throttled; i++) {
+    await attacker.goto(`${BASE}/signin`);
+    await attacker.fill('#email', email);
+    await attacker.fill('#password', `wrong-guess-${i}`);
+    await attacker.click('button:has-text("Sign in")');
+    await attacker.waitForTimeout(250);
+    const text = await attacker.locator('main').innerText();
+    if (/Too many sign-in attempts/i.test(text)) throttled = true;
+    else if (!/did not match/i.test(text)) break;
+  }
+  check('repeated password guesses get throttled', throttled);
+  await attacker.close();
 } catch (err) {
   failures.push(`threw: ${err.message}`);
   console.error('\nERROR', err);

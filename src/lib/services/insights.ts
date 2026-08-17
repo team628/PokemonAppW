@@ -48,7 +48,14 @@ export interface TradeCandidate extends TradeMatchInput {
  * materialised want/have index rather than a live join, but the query and its
  * result contract stay the same.
  */
-export function tradeMatches(db: DB, userId: string, views: GoalView[]): TradeCandidate[] {
+export const TRADE_MATCH_LIMIT = 400;
+
+export function tradeMatches(
+  db: DB,
+  userId: string,
+  views: GoalView[],
+  opts: { limit?: number } = {},
+): TradeCandidate[] {
   if (!views.length) return [];
   const setIds = [...new Set(views.map((v) => v.set.id))];
   const mine = missingSlotKeys(views);
@@ -65,23 +72,62 @@ export function tradeMatches(db: DB, userId: string, views: GoalView[]): TradeCa
        JOIN users u ON u.id = ci.user_id
        JOIN cards c ON c.id = ci.card_id
        LEFT JOIN prices p ON p.card_id = ci.card_id AND p.variant = ci.variant AND p.provider='tcgplayer'
-       WHERE ci.user_id != ? AND ci.for_trade = 1 AND c.set_id IN (${placeholders})`,
+       WHERE ci.user_id != ? AND ci.for_trade = 1 AND c.set_id IN (${placeholders})
+       ORDER BY p.market_cents DESC
+       LIMIT ?`,
     )
-    .all(userId, ...setIds) as {
+    .all(userId, ...setIds, (opts.limit ?? TRADE_MATCH_LIMIT) * 4) as {
     user_id: string; card_id: string; variant: string; quantity: number;
     handle: string; display_name: string; name: string; number: string;
     image_small: string | null; market_cents: number | null;
   }[];
 
-  const wanted = offered.filter((o) => mine.has(key(o.card_id, o.variant)));
+  const wanted = offered
+    .filter((o) => mine.has(key(o.card_id, o.variant)))
+    .slice(0, opts.limit ?? TRADE_MATCH_LIMIT);
   if (!wanted.length) return [];
 
   // Does each counterpart need anything this collector holds spare?
-  const mySpares = new Set(duplicates(db, userId).map((d) => key(d.cardId, d.variant)));
+  //
+  // This used to recompute every counterpart's full set metrics in JavaScript —
+  // O(counterparts x set size), and measured 1.8s at 1,000 collectors. It is now
+  // one aggregate restricted to the printings this collector actually holds
+  // spare, using the same goal-mode predicate as the want index.
+  const mySpares = duplicates(db, userId);
   const mutualBy = new Map<string, boolean>();
-  for (const counterpartId of new Set(wanted.map((w) => w.user_id))) {
-    const theirMissing = missingSlotKeys(goalViews(db, counterpartId));
-    mutualBy.set(counterpartId, [...mySpares].some((k) => theirMissing.has(k)));
+
+  if (mySpares.length) {
+    const spareKeys = new Set(mySpares.map((d) => key(d.cardId, d.variant)));
+    const spareCardIds = [...new Set(mySpares.map((d) => d.cardId))];
+    const counterparts = [...new Set(wanted.map((w) => w.user_id))];
+
+    const CHUNK = 300;
+    for (let i = 0; i < spareCardIds.length; i += CHUNK) {
+      const chunk = spareCardIds.slice(i, i + CHUNK);
+      const rows = db
+        .prepare(
+          `SELECT DISTINCT g.user_id, v.card_id, v.variant
+           FROM set_goals g
+           JOIN cards c ON c.set_id = g.set_id
+           JOIN card_variants v ON v.card_id = c.id
+           WHERE g.user_id IN (${counterparts.map(() => '?').join(',')})
+             AND v.card_id IN (${chunk.map(() => '?').join(',')})
+             AND (
+               g.mode = 'master'
+               OR (v.is_primary = 1 AND (g.mode = 'complete' OR c.is_secret = 0))
+             )
+             AND NOT EXISTS (
+               SELECT 1 FROM collection_items ci
+               WHERE ci.user_id = g.user_id AND ci.card_id = v.card_id
+                 AND ci.variant = v.variant AND ci.quantity > 0
+             )`,
+        )
+        .all(...counterparts, ...chunk) as { user_id: string; card_id: string; variant: string }[];
+
+      for (const r of rows) {
+        if (spareKeys.has(key(r.card_id, r.variant))) mutualBy.set(r.user_id, true);
+      }
+    }
   }
 
   return wanted.map((o) => ({

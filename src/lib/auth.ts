@@ -116,13 +116,17 @@ export function createUser(db: DB, input: CreateUserInput): User {
     display_name: display,
     avatar_color: palette[Math.floor(Math.random() * palette.length)]!,
     created_at: nowIso(),
-    share_public: 1,
+    share_public: 0,
   };
   db.prepare(
     `INSERT INTO users (id, email, handle, display_name, password_hash, avatar_color, created_at, share_public)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
   ).run(user.id, user.email, user.handle, user.display_name, hashPassword(input.password), user.avatar_color, user.created_at);
   return user;
+}
+
+export function setSharePublic(db: DB, userId: string, isPublic: boolean): void {
+  db.prepare('UPDATE users SET share_public = ? WHERE id = ?').run(isPublic ? 1 : 0, userId);
 }
 
 export function authenticate(db: DB, email: string, password: string): User | null {
