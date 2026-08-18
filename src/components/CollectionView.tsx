@@ -265,7 +265,7 @@ function Row({ h }: { h: HoldingView }) {
   return (
     <li className="panel flex items-center gap-3 p-2.5">
       <Link href={`/app/cards/${h.cardId}`} className="w-[48px] shrink-0">
-        <CardArt src={h.imageSmall} alt={h.name} label={`#${h.number}`} />
+        <CardArt src={h.imageSmall} alt={h.name} />
       </Link>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold">{h.name}</p>

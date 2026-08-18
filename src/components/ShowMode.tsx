@@ -424,7 +424,7 @@ export function ShowMode({
                 className="panel flex items-center gap-3 p-2.5"
               >
                 <div className="w-[52px] shrink-0">
-                  <CardArt src={s.imageSmall} alt={s.name} label={`#${s.number}`} />
+                  <CardArt src={s.imageSmall} alt={s.name} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="num text-[11px] font-bold text-ink-mute">
@@ -509,7 +509,7 @@ function PriceSheet({
       >
         <div className="flex items-center gap-3">
           <div className="w-14 shrink-0">
-            <CardArt src={slot.imageSmall} alt={slot.name} label={`#${slot.number}`} />
+            <CardArt src={slot.imageSmall} alt={slot.name} />
           </div>
           <div className="min-w-0">
             <p className="truncate font-bold">{slot.name}</p>
@@ -627,7 +627,7 @@ function Lookup({
         {hits.map((h) => (
           <li key={h.id} className="panel flex items-center gap-3 p-2.5">
             <div className="w-[52px] shrink-0">
-              <CardArt src={h.image_small} alt={h.name} label={`#${h.number}`} />
+              <CardArt src={h.image_small} alt={h.name} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{h.name}</p>

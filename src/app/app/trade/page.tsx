@@ -87,7 +87,7 @@ export default async function TradePage() {
                         {/* What they have that you need */}
                         <div className="flex min-w-0 flex-1 items-center gap-2.5 p-3">
                           <div className="w-[46px] shrink-0">
-                            <CardArt src={t.imageSmall} alt={t.name} label={`#${t.number}`} />
+                            <CardArt src={t.imageSmall} alt={t.name} />
                           </div>
                           <div className="min-w-0">
                             <p className="label">You get</p>
@@ -119,11 +119,7 @@ export default async function TradePage() {
                           {t.theirs ? (
                             <>
                               <div className="w-[46px] shrink-0">
-                                <CardArt
-                                  src={t.theirs.imageSmall}
-                                  alt={t.theirs.name}
-                                  label={`#${t.theirs.number}`}
-                                />
+                                <CardArt src={t.theirs.imageSmall} alt={t.theirs.name} />
                               </div>
                               <div className="min-w-0">
                                 <p className="label">You give</p>
@@ -172,7 +168,7 @@ export default async function TradePage() {
                       className="panel flex items-center gap-3 p-2.5"
                     >
                       <div className="w-[46px] shrink-0">
-                        <CardArt src={t.imageSmall} alt={t.name} label={`#${t.number}`} />
+                        <CardArt src={t.imageSmall} alt={t.name} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-semibold">{t.name}</p>
@@ -221,7 +217,7 @@ export default async function TradePage() {
               {spares.map((s) => (
                 <li key={s.item_id} className="panel flex items-center gap-3 p-2.5">
                   <div className="w-[46px] shrink-0">
-                    <CardArt src={s.image_small} alt={s.name} label={`#${s.number}`} />
+                    <CardArt src={s.image_small} alt={s.name} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold">{s.name}</p>

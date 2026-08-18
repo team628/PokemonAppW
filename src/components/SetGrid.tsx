@@ -259,7 +259,12 @@ export function SetGrid({
                   s.owned ? '' : 'opacity-95'
                 }`}
               >
-                <CardArt src={s.imageSmall} alt={s.name} owned={s.owned} label={`#${s.number}`} />
+                <CardArt
+                  src={s.imageSmall}
+                  alt={s.name}
+                  owned={s.owned}
+                  badge={mode === 'master' && s.variant !== 'normal' ? VARIANT_SHORT[s.variant] : null}
+                />
                 {s.owned && (
                   <span
                     aria-hidden
@@ -271,11 +276,6 @@ export function SetGrid({
                 {s.quantity > 1 && (
                   <span className="num absolute left-1 top-1 rounded-md bg-ink/85 px-1.5 py-0.5 text-[10px] font-bold">
                     ×{s.quantity}
-                  </span>
-                )}
-                {mode === 'master' && s.variant !== 'normal' && (
-                  <span className="num absolute bottom-1 left-1 rounded bg-ink/85 px-1 py-0.5 text-[9px] font-bold text-gold">
-                    {VARIANT_SHORT[s.variant]}
                   </span>
                 )}
               </button>

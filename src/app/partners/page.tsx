@@ -207,7 +207,7 @@ export default async function PartnersPage({
               {demand.slice(0, 40).map((d) => (
                 <li key={`${d.card_id}-${d.variant}`} className="panel flex items-center gap-3 p-2.5">
                   <div className="w-[44px] shrink-0">
-                    <CardArt src={d.image_small} alt={d.name} label={`#${d.number}`} />
+                    <CardArt src={d.image_small} alt={d.name} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold">{d.name}</p>

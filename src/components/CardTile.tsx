@@ -40,20 +40,17 @@ export function CardTile({
 
   const body = (
     <>
-      <div className="relative">
-        <CardArt
-          src={card.imageSmall}
-          alt={card.name}
-          owned={owned}
-          label={`#${card.number}`}
-          priority={priority}
-        />
-        {variantTag && (
-          <span className="absolute left-1 top-1 rounded bg-ink/85 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-ink-mute backdrop-blur">
-            {variantTag}
-          </span>
-        )}
-      </div>
+      {/* No `label`: the caption directly below already carries the number, and
+          the placeholder repeating it wastes the one line that could name the
+          card. The variant tag goes through CardArt so it never lands on top of
+          that name. */}
+      <CardArt
+        src={card.imageSmall}
+        alt={card.name}
+        owned={owned}
+        badge={variantTag}
+        priority={priority}
+      />
       <div className="mt-1.5 h-[26px]">
         <p className="num truncate text-[10px] leading-tight text-ink-mute">#{card.number}</p>
         {showPrice && (

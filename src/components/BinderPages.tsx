@@ -142,7 +142,10 @@ export function BinderPages({
               <div className={`pocket relative ${s.owned ? '' : 'pocket-empty'}`}>
                 {s.owned ? (
                   <div className="absolute inset-[3px] overflow-hidden rounded-[5px] shadow-slot transition group-active:scale-[.97]">
-                    <CardArt src={s.imageSmall} alt={s.name} owned label={`#${s.number}`} />
+                    {/* The pocket caption already prints the number; a
+                        placeholder that repeated it said the number twice and
+                        the card's name not at all. */}
+                    <CardArt src={s.imageSmall} alt={s.name} owned />
                   </div>
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
