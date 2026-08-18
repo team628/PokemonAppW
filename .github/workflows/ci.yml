@@ -78,6 +78,14 @@ jobs:
 
       - name: Apply migrations
         run: npm run migrate
+
+      # A redeploy re-applies the whole set, so "it works on an empty database"
+      # is not the property that matters. A migration that is only idempotent by
+      # assumption fails here rather than during a deploy — and a second pass
+      # would also expose any migration that grants a privilege an earlier one
+      # revoked.
+      - name: Re-apply migrations (they must be idempotent)
+        run: npm run migrate
       - name: Ingest catalog
         run: npm run ingest:catalog
       - name: Ingest prices
@@ -114,6 +122,20 @@ jobs:
 
       - name: Browser end-to-end
         run: node tests/e2e/flow.mjs http://localhost:3100
+
+      # A DOM-node bound on the largest master set, proved by scrolling it.
+      - name: Set-grid windowing stays bounded
+        run: node tests/e2e/virtualization.mjs http://localhost:3100
+
+      # The signature moment, and the once-only semantics behind it, at both
+      # motion preferences.
+      - name: Set completion moment
+        run: node tests/e2e/completion.mjs http://localhost:3100
+
+      # Every screen with the image CDN unreachable — the normal condition for
+      # Card Show mode, not an edge case.
+      - name: No artwork
+        run: node tests/e2e/no-artwork.mjs http://localhost:3100
 
       - name: Concurrency and idempotency over HTTP
         run: |

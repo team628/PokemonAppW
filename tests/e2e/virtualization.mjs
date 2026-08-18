@@ -14,7 +14,12 @@ import { existsSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const BASE = process.argv[2] ?? 'http://localhost:3100';
+// With a cookie, this runs against an existing collector — the 5,001-collector
+// load dataset locally. Without one it provisions its own, so CI can run it on
+// nothing but the catalog.
 const COOKIE = process.argv[3] ?? '';
+/** The largest master-set goal in the catalog: 360 printings. */
+const SET = 'sv3pt5';
 const PREINSTALLED = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const EXEC =
   process.env.PLAYWRIGHT_CHROMIUM ?? (existsSync(PREINSTALLED) ? PREINSTALLED : undefined);
@@ -54,9 +59,28 @@ await page.route('**/*', (route) => {
 const tiles = () => page.locator('ul[aria-label$="cards"] > li').count();
 
 try {
+  if (!COOKIE) {
+    // No identity supplied: become a collector, so the run needs nothing but
+    // the catalog. Card Show mode needs a tracked set to build a pull list
+    // from, and the grid needs somewhere to write an ownership toggle.
+    console.log('\nprovisioning a collector');
+    await page.goto(`${BASE}/signup`);
+    await page.fill('#displayName', 'Windowing');
+    await page.fill('#email', `windowing-${Date.now()}@example.com`);
+    await page.fill('#password', 'password-1234');
+    await page.click('button:has-text("Create account")');
+    await page.waitForURL('**/onboarding', { timeout: 20000 });
+    await page.fill('input[aria-label="Search sets"]', '151');
+    await page.waitForTimeout(400);
+    await page.click('li:has-text("151") button >> nth=0');
+    await page.click('button:has-text("Track 1 set")');
+    await page.waitForURL(`${BASE}/app`, { timeout: 20000 });
+    check('provisioned a collector tracking a large set', true);
+  }
+
   // ------------------------------------------------------------- the set grid
   console.log('\nset grid — a large master set');
-  await page.goto(`${BASE}/app/sets/sv3pt5?mode=master`);
+  await page.goto(`${BASE}/app/sets/${SET}?mode=master`);
   await page.waitForSelector('ul[aria-label$="cards"] > li');
   await page.waitForTimeout(500);
 

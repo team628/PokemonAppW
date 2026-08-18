@@ -18,6 +18,9 @@ import { existsSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const BASE = process.argv[2] ?? 'http://localhost:3100';
+// With a cookie this runs against an existing collector — the load dataset
+// locally. Without one it provisions its own, so CI needs nothing but the
+// catalog.
 const COOKIE = process.argv[3] ?? '';
 const PREINSTALLED = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const EXEC =
@@ -63,7 +66,42 @@ const artBoxes = () =>
     }),
   );
 
+/**
+ * Screens where a collector with no trading partners legitimately has no cards
+ * on screen. Reported when empty rather than failed — and still checked when
+ * they are not.
+ */
+const MAY_BE_EMPTY = new Set(['/app/trade']);
+const empty = [];
+
 try {
+  if (!COOKIE) {
+    console.log('\nprovisioning a collector');
+    await page.goto(`${BASE}/signup`);
+    await page.fill('#displayName', 'Offline');
+    await page.fill('#email', `offline-${Date.now()}@example.com`);
+    await page.fill('#password', 'password-1234');
+    await page.click('button:has-text("Create account")');
+    await page.waitForURL('**/onboarding', { timeout: 20000 });
+    await page.fill('input[aria-label="Search sets"]', '151');
+    await page.waitForTimeout(400);
+    await page.click('li:has-text("151") button >> nth=0');
+    await page.click('button:has-text("Track 1 set")');
+    await page.waitForURL(`${BASE}/app`, { timeout: 20000 });
+
+    // Enough holdings for the binder to have filled pockets and the collection
+    // to have rows — both are surfaces where a placeholder has to work.
+    await page.goto(`${BASE}/app/sets/sv3pt5`);
+    await page.waitForSelector('ul[aria-label$="cards"] li button[aria-pressed="false"]');
+    for (let i = 0; i < 10; i++) {
+      const next = page.locator('ul[aria-label$="cards"] li button[aria-pressed="false"]').first();
+      if (!(await next.count())) break;
+      await next.click();
+      await page.waitForTimeout(350);
+    }
+    check('provisioned a collector with cards to draw', true);
+  }
+
   for (const path of [
     '/app',
     '/app/sets/sv3pt5?mode=master',
@@ -79,7 +117,12 @@ try {
 
     const boxes = await artBoxes();
     if (boxes.length === 0) {
-      check(`${path} has card slots to check`, false, 'no .card-art found');
+      if (MAY_BE_EMPTY.has(path)) {
+        console.log(`  ---- ${path} has no cards on screen for this collector`);
+        empty.push(path);
+      } else {
+        check(`${path} has card slots to check`, false, 'no .card-art found');
+      }
       continue;
     }
 
@@ -181,7 +224,14 @@ try {
   await browser.close();
 }
 
-console.log(`\n${passed} passed, ${failures.length} failed`);
+console.log(
+  `\n${passed} passed, ${failures.length} failed${
+    empty.length ? `, ${empty.length} screen(s) had no cards to check` : ''
+  }`,
+);
+if (empty.length) {
+  console.log(`\nno cards on screen for this collector: ${empty.join(', ')}`);
+}
 if (failures.length) {
   console.log('\nfailures:');
   for (const f of failures) console.log(`  - ${f}`);

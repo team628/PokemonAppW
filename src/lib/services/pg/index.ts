@@ -625,11 +625,27 @@ export async function demandMeta() {
  * many set goals exist. No row, id, handle or holding is read, and nothing here
  * is attributable to anybody. The RLS policies themselves are untouched.
  */
+/**
+ * How many collectors exist, and how many set goals they are chasing.
+ *
+ * `profiles` and `set_goals` are owner-scoped under RLS, so an anonymous read
+ * of either correctly returns nothing — which is why the partner console
+ * reported zero collectors when it counted them directly. The fix is not to
+ * hand this code path the service role: that grants a whole region of
+ * TypeScript an RLS bypass in order to answer two integers, and every future
+ * edit inside it inherits the bypass.
+ *
+ * `public.demand_population()` is the narrower instrument. It is SECURITY
+ * DEFINER, it takes no arguments, and it returns two counts — there is no
+ * parameter for a caller to steer towards an individual, and no row of anyone's
+ * data crosses the boundary. See migration 0013.
+ */
 export async function demandPopulation(): Promise<{ collectors: number; tracked: number }> {
-  return withServiceRole(async (tx) => ({
-    collectors: (await tx.one<{ n: number }>('select count(*)::int as n from public.profiles'))!.n,
-    tracked: (await tx.one<{ n: number }>('select count(*)::int as n from public.set_goals'))!.n,
-  }));
+  return withIdentity(null, async (tx) =>
+    (await tx.one<{ collectors: number; tracked: number }>(
+      'select collectors, tracked from public.demand_population()',
+    ))!,
+  );
 }
 
 export async function rebuildWantIndex() {

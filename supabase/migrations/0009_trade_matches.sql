@@ -18,6 +18,13 @@
 --
 -- Marking a card for trade is what publishes the handle. Nothing else does.
 
+-- Dropped first, not replaced: migration 0012 widens this function's return
+-- type, and `create or replace` cannot change one. Without the drop, applying
+-- the migration set a second time — which is what a redeploy does — fails here
+-- with "cannot change return type of existing function" and leaves the schema
+-- half-reverted.
+drop function if exists public.trade_matches(integer);
+
 create or replace function public.trade_matches(p_limit integer default 60)
 returns table (
   card_id text,
