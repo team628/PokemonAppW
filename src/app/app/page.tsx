@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth/session';
 import { buildInsights, unseenMilestones } from '@/lib/services/pg';
 import { portfolioSummary } from '@/lib/services/pg/collection';
-import { withIdentity } from '@/lib/db/pg';
 import { GoalHero } from '@/components/GoalHero';
 import { MoveCard } from '@/components/MoveCard';
 import { SetCard } from '@/components/SetCard';
@@ -32,17 +31,11 @@ export default async function Dashboard() {
   const others = insights.goals.filter((v) => v.goalId !== hero?.goalId);
   const totalNeed = insights.goals.reduce((s, v) => s + v.needCents, 0);
 
-  // The cards standing between this collector and a finished set. One bounded
-  // query against the same function the set page uses — not a fetch per card.
-  const strip =
-    hero && hero.missingCount > 0
-      ? await withIdentity(user.id, (tx) =>
-          tx.rows<{
-            card_id: string; variant: string; number: string; name: string;
-            image_small: string | null; market_cents: number | null;
-          }>('select * from public.goal_missing($1, $2, $3, 0)', [hero.setId, hero.mode, STRIP])
-        )
-      : [];
+  // The cards standing between this collector and a finished set. Already in
+  // memory: `buildInsights` loads the missing printings behind every goal for
+  // the move engine, in set order, so the rail is a slice rather than a second
+  // trip to the database for the same rows.
+  const strip = hero ? (insights.missingByGoal.get(hero.goalId) ?? []).slice(0, STRIP) : [];
 
   const milestones: MilestonePayload[] = milestoneRows.map((m) => {
     const p = (m.payload ?? {}) as Record<string, number>;
@@ -101,19 +94,19 @@ export default async function Dashboard() {
             </SectionTitle>
             <ul className="rail rail-bleed flex gap-2.5 overflow-x-auto pb-1">
               {strip.map((c) => (
-                <li key={`${c.card_id}-${c.variant}`} className="shrink-0">
+                <li key={`${c.cardId}-${c.variant}`} className="shrink-0">
                   <CardTile
                     card={{
-                      cardId: c.card_id,
+                      cardId: c.cardId,
                       name: c.name,
                       number: c.number,
                       variant: c.variant,
-                      imageSmall: c.image_small,
-                      marketCents: c.market_cents,
+                      imageSmall: c.imageSmall,
+                      marketCents: c.marketCents,
                       owned: false,
                     }}
                     width="w-[78px]"
-                    href={`/app/cards/${c.card_id}`}
+                    href={`/app/cards/${c.cardId}`}
                   />
                 </li>
               ))}

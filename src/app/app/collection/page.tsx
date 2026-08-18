@@ -33,7 +33,7 @@ export default async function CollectionPage({
   const applyCondition = sp.raw !== '1';
   const browsing = !!(sp.q || sp.view || sp.page);
 
-  const [summary, result, deck] = await Promise.all([
+  const [summary, result, deckSets, deckTop] = await Promise.all([
     portfolioSummary(user.id),
     listHoldingsPage(user.id, {
       view: VIEWS.find((v) => v === sp.view),
@@ -43,39 +43,65 @@ export default async function CollectionPage({
       applyCondition,
     }),
     // Two bounded aggregates for the command deck. Both group in SQL — a
-    // 15,000-card collection costs the same as a 50-card one.
-    withIdentity(user.id, async (tx) => {
-      const sets = await tx.rows<{ set_id: string; set_name: string; cards: number; cents: number }>(
-        `select c.set_id, s.name as set_name,
-                sum(ci.quantity)::int as cards,
-                coalesce(sum(case when coalesce(ci.grade_company,'') = ''
-                  then public.slot_market_cents(p.market_cents,p.mid_cents,p.low_cents) * ci.quantity end), 0)::bigint as cents
-         from public.collection_items ci
-         join public.cards c on c.id = ci.card_id
+    // 15,000-card collection costs the same as a 50-card one — and they run as
+    // separate reads so the page waits for the slower rather than for the sum.
+    withIdentity(user.id, (tx) =>
+      tx.rows<{ set_id: string; set_name: string; cards: number; cents: number }>(
+        // Priced per printing before the catalog join: valuing 15,000 holdings
+        // and *then* looking each one up in `cards` did the identity lookup for
+        // rows that only ever contribute to a sum.
+        `with mine as (
+           select ci.card_id, ci.variant,
+                  sum(ci.quantity)::int as qty,
+                  sum(case when coalesce(ci.grade_company,'') = '' then ci.quantity else 0 end)::int as raw_qty
+           from public.collection_items ci
+           group by ci.card_id, ci.variant
+         ),
+         priced as (
+           select m.card_id, m.qty, m.raw_qty,
+                  public.slot_market_cents(p.market_cents,p.mid_cents,p.low_cents) as cents
+           from mine m
+           left join public.prices p
+             on p.card_id = m.card_id and p.variant = m.variant and p.provider = 'tcgplayer'
+         )
+         select c.set_id, s.name as set_name,
+                sum(pr.qty)::int as cards,
+                coalesce(sum(pr.cents * pr.raw_qty), 0)::bigint as cents
+         from priced pr
+         join public.cards c on c.id = pr.card_id
          join public.sets s on s.id = c.set_id
-         left join public.prices p
-           on p.card_id = ci.card_id and p.variant = ci.variant and p.provider = 'tcgplayer'
          group by c.set_id, s.name
          order by cents desc
          limit 6`,
-      );
-      const top = await tx.rows<{
+      ),
+    ),
+    withIdentity(user.id, (tx) =>
+      tx.rows<{
         card_id: string; variant: string; number: string; name: string;
         image_small: string | null; cents: number | null;
       }>(
-        `select ci.card_id, ci.variant, c.number, c.name, c.image_small,
-                public.slot_market_cents(p.market_cents,p.mid_cents,p.low_cents) as cents
-         from public.collection_items ci
-         join public.cards c on c.id = ci.card_id
-         left join public.prices p
-           on p.card_id = ci.card_id and p.variant = ci.variant and p.provider = 'tcgplayer'
-         where coalesce(ci.grade_company,'') = ''
-         order by cents desc nulls last
-         limit 12`,
-      );
-      return { sets, top };
-    }),
+        // Rank the twelve most valuable printings on price alone, then fetch
+        // names and artwork for those twelve. The catalog join used to run for
+        // every holding purely so the sort could throw the rows away.
+        `with mine as (
+           select ci.card_id, ci.variant,
+                  public.slot_market_cents(p.market_cents,p.mid_cents,p.low_cents) as cents
+           from public.collection_items ci
+           left join public.prices p
+             on p.card_id = ci.card_id and p.variant = ci.variant and p.provider = 'tcgplayer'
+           where coalesce(ci.grade_company,'') = ''
+           group by ci.card_id, ci.variant, p.market_cents, p.mid_cents, p.low_cents
+           order by cents desc nulls last
+           limit 12
+         )
+         select m.card_id, m.variant, c.number, c.name, c.image_small, m.cents
+         from mine m
+         join public.cards c on c.id = m.card_id
+         order by m.cents desc nulls last`,
+      ),
+    ),
   ]);
+  const deck = { sets: deckSets, top: deckTop };
 
   const rows: HoldingView[] = result.rows.map((h) => ({
     id: h.id,

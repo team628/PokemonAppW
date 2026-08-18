@@ -229,20 +229,107 @@ export interface Insights {
   dupes: DupeInput[];
   drops: PriceDropInput[];
   historyTooShallow: boolean;
+  /**
+   * The missing printings behind each goal, keyed by goal id, already loaded
+   * for the move engine. Exposed so callers that want to *show* those cards —
+   * the dashboard rail, for one — read the list that is already in memory
+   * instead of asking the database the same question a second time.
+   */
+  missingByGoal: Map<string, MissingSlot[]>;
 }
 
+export type MissingSlot = Awaited<ReturnType<typeof loadMissing>>[number];
+
+/**
+ * Everything the dashboard, the move engine and the trade screen need.
+ *
+ * The reads fall into three groups that do not depend on one another, so they
+ * run as three concurrent transactions rather than one serial one. Each opens
+ * its own connection and sets its own identity, so RLS is applied exactly as it
+ * would be for a single-statement read — the parallelism is in the client, not
+ * in the authorization model.
+ *
+ *   A. the goals, then the missing printings behind them (ordered: the missing
+ *      query is driven by the goal rows)
+ *   B. spare copies, real price movement, and whether any history exists to
+ *      compare against
+ *   C. cross-collector trade matches, the one audited SECURITY DEFINER read
+ *
+ * Nothing in B or C needs a value from A. The old code ran all of it in one
+ * transaction, so the page waited for the sum; it now waits for the slowest.
+ */
 export async function buildInsights(userId: string, budgetCents?: number | null): Promise<Insights> {
+  const [{ goals, missingByGoal }, { dupes, drops, shallow }, trades] = await Promise.all([
+    loadGoalsAndMissing(userId),
+    loadMarketContext(userId),
+    withIdentity(userId, (tx) => loadTradeMatches(tx)),
+  ]);
+
+  const moves = computeMoves({
+    goals: goals
+      .filter((g) => g.missingCount > 0)
+      .map((g) => ({
+        goalId: g.goalId,
+        setId: g.setId,
+        setName: g.setName,
+        mode: g.mode,
+        metrics: {
+          mode: g.mode,
+          requiredCount: g.requiredCount,
+          ownedCount: g.ownedCount,
+          missingCount: g.missingCount,
+          percent: g.percent,
+          haveCents: g.haveCents,
+          needCents: g.needCents,
+          completeCents: g.completeCents,
+          needAcquisitionCents: g.needAcquisitionCents,
+          pricedOwned: 0,
+          unpricedOwned: 0,
+          pricedMissing: g.pricedMissing,
+          unpricedMissing: g.unpricedMissing,
+          needIsFloor: g.needIsFloor,
+          oldestObservation: g.oldestObservation,
+          variantConfidence: g.variantConfidence,
+          missing: missingByGoal.get(g.goalId) ?? [],
+          owned: [],
+        },
+      })),
+    dupes,
+    tradeMatches: trades,
+    priceDrops: drops,
+    budgetCents,
+  });
+
+  return { goals, moves, trades, dupes, drops, historyTooShallow: shallow, missingByGoal };
+}
+
+/**
+ * The tracked sets and, in one further round trip, every printing still missing
+ * from each of them.
+ *
+ * The missing lists used to be fetched one query per goal. A collector chasing
+ * eight sets paid eight round trips for a question the database can answer in
+ * one lateral — the per-goal cap still applies inside the lateral, so the
+ * result is row-for-row identical.
+ */
+async function loadGoalsAndMissing(userId: string) {
   return withIdentity(userId, async (tx) => {
     const goals = (await tx.rows<GoalRow>('select * from public.my_goals()')).map(toGoalView);
-
-    // Missing lists, capped per goal — the move engine only needs the cheap tail
-    // and a handful of examples, never the whole set.
-    const missingByGoal = new Map<string, Awaited<ReturnType<typeof loadMissing>>>();
-    for (const g of goals) {
-      if (g.missingCount === 0) continue;
-      missingByGoal.set(g.goalId, await loadMissing(tx, g.setId, g.mode));
+    const missingByGoal = new Map<string, MissingSlot[]>();
+    if (goals.some((g) => g.missingCount > 0)) {
+      for (const row of await loadMissing(tx)) {
+        const list = missingByGoal.get(row.goalId);
+        if (list) list.push(row);
+        else missingByGoal.set(row.goalId, [row]);
+      }
     }
+    return { goals, missingByGoal };
+  });
+}
 
+/** Spares, observed price movement, and whether any history exists at all. */
+async function loadMarketContext(userId: string) {
+  return withIdentity(userId, async (tx) => {
     const dupes = (await tx.rows<{
       card_id: string; variant: string; name: string; number: string;
       image_small: string | null; spare: number; base_cents: number | null; condition: keyof typeof CONDITION_MULTIPLIER;
@@ -262,8 +349,7 @@ export async function buildInsights(userId: string, budgetCents?: number | null)
         : Math.round(d.base_cents * (CONDITION_MULTIPLIER[d.condition] ?? 1)),
     }));
 
-    const trades = await loadTradeMatches(tx, goals);
-    const drops = await loadPriceDrops(tx, goals);
+    const drops = await loadPriceDrops(tx);
 
     const shallow = (await tx.one<{ comparable: boolean }>(
       `select exists (
@@ -272,54 +358,34 @@ export async function buildInsights(userId: string, budgetCents?: number | null)
        ) as comparable`,
     ))!.comparable !== true;
 
-    const moves = computeMoves({
-      goals: goals
-        .filter((g) => g.missingCount > 0)
-        .map((g) => ({
-          goalId: g.goalId,
-          setId: g.setId,
-          setName: g.setName,
-          mode: g.mode,
-          metrics: {
-            mode: g.mode,
-            requiredCount: g.requiredCount,
-            ownedCount: g.ownedCount,
-            missingCount: g.missingCount,
-            percent: g.percent,
-            haveCents: g.haveCents,
-            needCents: g.needCents,
-            completeCents: g.completeCents,
-            needAcquisitionCents: g.needAcquisitionCents,
-            pricedOwned: 0,
-            unpricedOwned: 0,
-            pricedMissing: g.pricedMissing,
-            unpricedMissing: g.unpricedMissing,
-            needIsFloor: g.needIsFloor,
-            oldestObservation: g.oldestObservation,
-            variantConfidence: g.variantConfidence,
-            missing: missingByGoal.get(g.goalId) ?? [],
-            owned: [],
-          },
-        })),
-      dupes,
-      tradeMatches: trades,
-      priceDrops: drops,
-      budgetCents,
-    });
-
-    return { goals, moves, trades, dupes, drops, historyTooShallow: shallow };
+    return { dupes, drops, shallow };
   });
 }
 
-async function loadMissing(tx: { rows: <T>(s: string, p?: readonly unknown[]) => Promise<T[]> }, setId: string, mode: GoalMode) {
+/**
+ * Every printing still missing from every goal the caller tracks, in one query.
+ *
+ * The per-goal cap lives inside the lateral, so each goal contributes at most
+ * the same 2,000 rows the per-goal call returned, in the same order. `set_goals`
+ * is owner-scoped by RLS, so the lateral can only ever expand the caller's own
+ * goals.
+ */
+async function loadMissing(tx: { rows: <T>(s: string, p?: readonly unknown[]) => Promise<T[]> }) {
   const rows = await tx.rows<{
+    goal_id: string;
     card_id: string; variant: string; number: string; number_sort: number; name: string;
     rarity: string | null; image_small: string | null; market_cents: number | null;
     acquisition_cents: number | null; basis: string | null; observed_on: string | null;
     variant_source: 'market_data' | 'inferred';
-  }>('select * from public.goal_missing($1, $2, 2000, 0)', [setId, mode]);
+  }>(
+    `select g.id as goal_id, m.*
+     from public.set_goals g
+     cross join lateral public.goal_missing(g.set_id, g.mode, 2000, 0) m
+     where g.user_id = auth.uid()`,
+  );
 
   return rows.map((r) => ({
+    goalId: r.goal_id,
     cardId: r.card_id,
     variant: r.variant as Variant,
     number: r.number,
@@ -348,10 +414,7 @@ async function loadMissing(tx: { rows: <T>(s: string, p?: readonly unknown[]) =>
  */
 async function loadTradeMatches(
   tx: { rows: <T>(s: string, p?: readonly unknown[]) => Promise<T[]> },
-  goals: GoalView[],
 ) {
-  if (!goals.length) return [];
-
   return (await tx.rows<{
     card_id: string; variant: string; name: string; number: string;
     image_small: string | null; market_cents: number | null;
@@ -385,14 +448,16 @@ async function loadTradeMatches(
 /** Real, observed price movement — two dated readings of the same printing. */
 async function loadPriceDrops(
   tx: { rows: <T>(s: string, p?: readonly unknown[]) => Promise<T[]> },
-  goals: GoalView[],
 ): Promise<PriceDropInput[]> {
-  if (!goals.length) return [];
   return (await tx.rows<{
     card_id: string; variant: string; name: string; number: string; set_id: string;
     image_small: string | null; current_cents: number; previous_cents: number;
     current_on: string; previous_on: string;
   }>(
+    // The previous reading comes from `lead()` over the same window rather than
+    // a second pass joined back to the first. The self-join was quadratic in the
+    // number of missing printings — 1,265 open holes meant 1.6M row comparisons
+    // — and produced exactly the row this does.
     `with missing as (
        select distinct s.card_id, s.variant, g.set_id
        from public.set_goals g
@@ -405,21 +470,23 @@ async function loadPriceDrops(
      ),
      ranked as (
        select pp.card_id, pp.variant, pp.observed_on, pp.market_cents,
-              row_number() over (partition by pp.card_id, pp.variant order by pp.observed_on desc) as rn
+              row_number() over w as rn,
+              lead(pp.market_cents) over w as previous_cents,
+              lead(pp.observed_on) over w as previous_on
        from public.price_points pp
        join missing m on m.card_id = pp.card_id and m.variant = pp.variant
        where pp.provider = 'tcgplayer' and pp.market_cents is not null
+       window w as (partition by pp.card_id, pp.variant order by pp.observed_on desc)
      )
      select cur.card_id, cur.variant, c.name, c.number, m.set_id, c.image_small,
-            cur.market_cents as current_cents, prev.market_cents as previous_cents,
-            cur.observed_on::text as current_on, prev.observed_on::text as previous_on
+            cur.market_cents as current_cents, cur.previous_cents as previous_cents,
+            cur.observed_on::text as current_on, cur.previous_on::text as previous_on
      from ranked cur
-     join ranked prev on prev.card_id = cur.card_id and prev.variant = cur.variant and prev.rn = 2
      join missing m on m.card_id = cur.card_id and m.variant = cur.variant
      join public.cards c on c.id = cur.card_id
-     where cur.rn = 1 and prev.market_cents > 0
-       and (prev.market_cents - cur.market_cents)::numeric / prev.market_cents >= 0.10
-     order by (prev.market_cents - cur.market_cents) desc
+     where cur.rn = 1 and cur.previous_cents > 0
+       and (cur.previous_cents - cur.market_cents)::numeric / cur.previous_cents >= 0.10
+     order by (cur.previous_cents - cur.market_cents) desc
      limit 12`,
   )).map((r) => ({
     cardId: r.card_id,
