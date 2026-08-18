@@ -1,22 +1,18 @@
 name: CI
 
 on:
+  # Pull requests cover feature branches; push covers what lands on main.
+  # Both firing on a PR branch would run the whole suite twice on one commit.
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  # Bump to force a cold re-fetch of the provider data.
-  RAW_DATA_EPOCH: v1
-
 jobs:
-  # Fast feedback that needs no database: types and a production build. Every
-  # page is force-dynamic, so the build never touches PostgreSQL.
   static:
     name: Typecheck and build
     runs-on: ubuntu-latest
@@ -36,7 +32,7 @@ jobs:
   test:
     name: PostgreSQL test suite
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -46,13 +42,18 @@ jobs:
           POSTGRES_DB: postgres
         ports: ['5432:5432']
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      # Any provider request that would leave the runner is an error. The
+      # pinned snapshot is meant to satisfy every read; without this a missing
+      # file would fall through to the live API and quietly reintroduce the
+      # flakiness the snapshot exists to remove.
+      SETVALUE_PROVIDER_OFFLINE: '1'
       # Local development identity. Deliberately NOT a Supabase project: there
       # are no Supabase credentials in CI, and substituting one would make the
       # blocked checks below look like they had passed.
@@ -67,30 +68,16 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # ---------------------------------------------------------------- data
       # The integrity, parity and import suites assert against the real
-      # catalog — 174 sets, 20,000+ cards, >85% price coverage. They cannot run
-      # against a fixture without becoming a test of the fixture.
-      - name: Restore provider data
-        id: raw-cache
-        uses: actions/cache@v4
-        with:
-          path: data/raw
-          key: raw-${{ env.RAW_DATA_EPOCH }}-${{ hashFiles('scripts/fetch-catalog.mjs', 'scripts/fetch-prices.mjs') }}
-          restore-keys: raw-${{ env.RAW_DATA_EPOCH }}-
+      # catalog — 174 sets, 20,444 cards, >85% price coverage. The snapshot is
+      # a capture of real provider data, not synthesized, so those assertions
+      # keep their meaning while the run stays deterministic. ci-live.yml is
+      # what checks the snapshot against the live providers.
+      - name: Restore pinned provider snapshot
+        run: node scripts/pg/snapshot.mjs restore
 
-      # Both scripts skip files already on disk, so a warm cache costs seconds
-      # and a partial cache only fetches what is missing. This also keeps CI
-      # from hammering the public pokemontcg.io API on every run.
-      - name: Fetch catalog
-        run: node scripts/fetch-catalog.mjs
-      - name: Fetch prices
-        run: node scripts/fetch-prices.mjs
-
-      # ------------------------------------------------------------- schema
       - name: Apply migrations
         run: npm run migrate
-
       - name: Ingest catalog
         run: npm run ingest:catalog
       - name: Ingest prices
@@ -105,17 +92,14 @@ jobs:
                    (select count(*) from public.prices)         as prices,
                    (select max(observed_on) from public.prices) as newest_price;"
 
-      # -------------------------------------------------------------- tests
       # Includes the adversarial RLS suite, SQL-vs-TypeScript completion
       # parity, catalog integrity, concurrency, demand-index reconciliation,
       # import throughput and the billing feature flag.
       - name: Test suite
         run: npm test
 
-      # ---------------------------------------------------------------- e2e
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-
       - name: Build
         run: npm run build
 
@@ -140,7 +124,6 @@ jobs:
         if: always()
         run: tail -50 /tmp/server.log || true
 
-      # --------------------------------------------------- what was NOT run
       # Stated in the job summary so a green tick is not read as more coverage
       # than it is.
       - name: Declare unverified surface
@@ -149,9 +132,9 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           ### Not verified by this run
 
-          These need credentials or extensions that do not exist in CI. They are
-          reported here rather than stubbed, skipped silently, or asserted against
-          a substitute that would make them look green.
+          These need credentials, extensions or live services that do not exist in
+          PR validation. They are reported here rather than stubbed, skipped
+          silently, or asserted against a substitute that would make them look green.
 
           - **Supabase Auth** — no project credentials. Password verification, magic
             links and password reset are Supabase's; CI runs the local development
@@ -160,11 +143,12 @@ jobs:
             front of it *is* exercised.
           - **pg_cron / pg_net scheduling** — not available on the stock `postgres:16`
             image. Migration 0007 detects this and skips registration;
-            `supabase/schedule.sql` is deliberately not applied here. The hourly price
-            and nightly catalog jobs are therefore unscheduled in CI, though the
-            functions they call are exercised by the ingest steps above.
+            `supabase/schedule.sql` is deliberately not applied here.
           - **Supavisor connection pooler** — CI connects straight to PostgreSQL. The
-            transaction-mode pooler that production uses on Vercel is untested here.
+            transaction-mode pooler production uses on Vercel is untested here.
+          - **Live provider APIs** — this run is offline against a pinned snapshot of
+            real provider data, so it is deterministic. The live catalog and price
+            APIs are exercised by the `Live provider data` workflow on a schedule.
           - **The 5,001-collector load harness** — generating that population takes
             about six minutes and measures the runner more than the code. Run it
             locally with `npm run load:generate -- 5000`.

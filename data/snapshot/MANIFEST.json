@@ -1,0 +1,11 @@
+{
+  "capturedOn": "2026-08-18",
+  "catalogSource": "https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master",
+  "priceSource": "https://api.pokemontcg.io/v2 (TCGplayer USD + Cardmarket EUR aggregates)",
+  "setFiles": 174,
+  "priceFiles": 174,
+  "sha256": {
+    "catalog.tar.gz": "7cc1e3c9a1ef954181e6075a65a6c0b10ed18ab6588b556b69f30f77d6f050f4",
+    "prices.tar.gz": "2f5bfeedbb3331bd3596343c97f314c1c118a1cc35fb65c8b7258ba0af3512d3"
+  }
+}

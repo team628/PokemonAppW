@@ -21,7 +21,25 @@ const CATALOG_BASE = 'https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-d
 const API_BASE = process.env.POKEMONTCG_API_BASE ?? 'https://api.pokemontcg.io/v2';
 const MIRROR = path.join(process.cwd(), 'data', 'raw');
 
+/**
+ * Offline mode. When set, any request that would leave the machine is an error
+ * rather than a silent network call.
+ *
+ * This is what makes deterministic CI provable instead of assumed: the mirror
+ * is meant to satisfy every read, and a missing file would otherwise fall
+ * through to the live API and quietly reintroduce the flakiness the snapshot
+ * exists to remove.
+ */
+function offline(): boolean {
+  return process.env.SETVALUE_PROVIDER_OFFLINE === '1';
+}
+
 async function getJson<T>(url: string, tries = 5): Promise<T> {
+  if (offline()) {
+    throw new Error(
+      `refusing to fetch ${url}: SETVALUE_PROVIDER_OFFLINE is set and this is not in the local mirror`,
+    );
+  }
   let lastErr: unknown;
   for (let i = 0; i < tries; i++) {
     try {

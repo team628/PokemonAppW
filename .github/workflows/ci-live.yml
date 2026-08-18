@@ -1,0 +1,135 @@
+name: Live provider data
+
+# The integration lane. This one really does talk to the catalog repository and
+# the pokemontcg.io price API, ingests what comes back, and runs the same suite
+# against it.
+#
+# It is deliberately NOT a required PR check. The price API returns HTTP 500 on
+# individual sets from time to time, which is a fact about a third party rather
+# than a fact about this pull request. Keeping it here means a live failure is
+# visible and investigable without making every unrelated PR red.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      refresh_snapshot:
+        description: 'Upload the freshly fetched corpus as an artifact to re-pin the snapshot'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Live catalog and price ingest
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      SETVALUE_ALLOW_LOCAL_AUTH: 'yes'
+      SETVALUE_LOCAL_AUTH_SECRET: ci-local-auth-secret
+      # An API key raises the rate limit if one is configured; the endpoint
+      # works without it, so its absence is not a failure.
+      POKEMONTCG_API_KEY: ${{ secrets.POKEMONTCG_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Fetch live catalog
+        run: node scripts/fetch-catalog.mjs
+      - name: Fetch live prices
+        run: node scripts/fetch-prices.mjs
+
+      - name: Apply migrations
+        run: npm run migrate
+      - name: Ingest live catalog
+        run: npm run ingest:catalog
+
+      # Tolerates per-set provider failures, records them, and finishes the
+      # sync run as `partial`. A set the provider cannot serve becomes unpriced,
+      # never guessed at.
+      - name: Ingest live prices
+        run: npm run ingest:prices
+
+      - name: Compare the live corpus against the pinned snapshot
+        run: |
+          echo "### Live corpus" >> "$GITHUB_STEP_SUMMARY"
+          psql "$DATABASE_URL" -c "
+            select (select count(*) from public.sets)          as sets,
+                   (select count(*) from public.cards)         as cards,
+                   (select count(*) from public.card_variants) as printings,
+                   (select count(*) from public.prices)        as prices,
+                   (select round(100.0 * count(*) filter (where p.card_id is not null)
+                                 / nullif(count(*), 0), 1)
+                      from public.card_variants v
+                      left join public.prices p
+                        on p.card_id = v.card_id and p.variant = v.variant
+                       and p.provider = 'tcgplayer')           as usd_coverage_pct,
+                   (select max(observed_on) from public.prices) as newest_price;" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '### Pinned snapshot' >> "$GITHUB_STEP_SUMMARY"
+          cat data/snapshot/MANIFEST.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report partial sync runs
+        run: |
+          psql "$DATABASE_URL" -c "
+            select kind, status, rows_written, items_ok, items_failed, notes
+            from public.sync_runs order by id desc limit 5;"
+
+      # The same battery the deterministic lane runs, but against data fetched
+      # minutes ago. This is what catches the catalog changing shape underneath
+      # the pinned snapshot.
+      - name: Test suite against live data
+        run: npm test
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build
+        run: npm run build
+      - name: Start server
+        run: |
+          NODE_ENV=production npx next start -p 3100 > /tmp/server.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:3100/signin && exit 0
+            sleep 1
+          done
+          echo "server did not come up"; cat /tmp/server.log; exit 1
+      - name: Browser end-to-end against live data
+        run: node tests/e2e/flow.mjs http://localhost:3100
+
+      # Re-pinning is a deliberate act, not something a scheduled job does on
+      # its own: the snapshot is what every PR is validated against, so it
+      # changes by a reviewed commit.
+      - name: Package a refreshed snapshot
+        if: inputs.refresh_snapshot
+        run: node scripts/pg/snapshot.mjs capture
+      - name: Upload refreshed snapshot
+        if: inputs.refresh_snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-snapshot
+          path: data/snapshot/
+          retention-days: 7

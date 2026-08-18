@@ -166,8 +166,22 @@ async function ingestPrices() {
     const covered = new Set<string>();
     let rejectedReverse = 0;
 
+    // A provider failing on one set must not discard the other 173. This is a
+    // single transaction, so an uncaught throw here rolls back every set that
+    // did work — and the upstream API does persistently 500 on some sets.
+    // Failures are collected, the run is finished as `partial`, and the cards
+    // in a failed set fall through to the era+rarity inference below, where
+    // they are labelled `inferred` rather than pretending to be market data.
+    const failedSets: string[] = [];
+
     for (const set of sets) {
-      const quotes = await provider.listPrices(set.id);
+      let quotes: Awaited<ReturnType<typeof provider.listPrices>>;
+      try {
+        quotes = await provider.listPrices(set.id);
+      } catch (e) {
+        failedSets.push(`${set.id}:${(e as Error).message.slice(0, 80)}`);
+        continue;
+      }
       for (const q of quotes) {
         const meta = cardMeta.get(q.cardId);
         if (!meta) continue;
@@ -280,13 +294,33 @@ async function ingestPrices() {
          low_cents = coalesce(excluded.low_cents, public.price_points.low_cents)`,
       ['card_id', 'variant', 'provider', 'observed_on']);
 
-    await tx.exec(`select public.finish_sync_run($1, 'succeeded', $2, $3, 0, $4)`, [
+    // `partial` is the honest status when some sets are missing: the corpus is
+    // usable but incomplete, and the count and the set ids are recorded rather
+    // than rounded up to success.
+    const status = failedSets.length ? 'partial' : 'succeeded';
+    await tx.exec(`select public.finish_sync_run($1, $5::public.sync_status, $2, $3, $6, $4)`, [
       runId, written, covered.size,
-      `${covered.size} cards from market data, ${inferredCards} inferred, ${rejectedReverse} anachronistic reverse-holo listings rejected`,
+      `${covered.size} cards from market data, ${inferredCards} inferred, ` +
+        `${rejectedReverse} anachronistic reverse-holo listings rejected` +
+        (failedSets.length ? `; ${failedSets.length} sets unavailable: ${failedSets.join(', ')}` : ''),
+      status, failedSets.length,
     ]);
 
     console.log(`variants: ${variantRows.length}, prices: ${written}, inferred cards: ${inferredCards}`);
     console.log(`rejected ${rejectedReverse} reverse-holo listings on sets predating reverse holos`);
+
+    if (failedSets.length) {
+      console.warn(
+        `\nPARTIAL: ${failedSets.length}/${sets.length} sets could not be priced and are ` +
+          `recorded as unpriced, not guessed at:\n  ${failedSets.join('\n  ')}`,
+      );
+      // Nothing at all landing means the provider is down, not flaky — that is
+      // a failure. A handful of bad sets is not, and the coverage assertion in
+      // tests/pg/data-integrity.test.ts is what decides whether enough landed.
+      if (failedSets.length === sets.length) {
+        throw new Error('every set failed to price — provider unavailable');
+      }
+    }
   });
 }
 

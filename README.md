@@ -13,10 +13,15 @@ It answers the questions a collector actually has:
 ```bash
 npm install
 export SUPABASE_DB_URL=postgresql://…      # a Supabase project, or any PostgreSQL 15+
-npm run setup       # downloads the catalog + prices, migrates, ingests (~5 min)
+npm run setup       # restores the pinned provider snapshot, migrates, ingests (~1 min)
 npm run seed:demo   # optional: two demo collectors with real holdings
 npm run build && npm start
 ```
+
+`npm run setup` works offline: `data/snapshot/` holds a capture of real provider
+data — 174 sets, 20,444 cards, 66,951 prices — so a clone reproduces the exact corpus
+CI validates against. `npm run setup:live` fetches from the providers instead, which is
+what you want when refreshing the snapshot (`npm run snapshot:capture`).
 
 `npm run setup` runs `npm run migrate`, which applies `supabase/migrations/*.sql` in
 order. Every migration is idempotent, so it is safe to re-run. Against a hosted project
@@ -85,7 +90,7 @@ Concretely:
 - Played cards are discounted from Near Mint using the standard trade-in bands
   (LP 85%, MP 70%, HP 50%, DMG 30%). These are estimates and are labelled as such.
 - **Price-change alerts stay switched off** until two readings of the *same*
-  printing exist. One data point is not a trend. Run `npm run snapshot:prices`
+  printing exist. One data point is not a trend. Run `npm run prices:refresh`
   daily and change tracking switches itself on.
 - **Graded cards are not valued.** A PSA 10 and a raw copy are different objects to the
   market, routinely by one or two orders of magnitude, and SetValue has no graded price
@@ -220,6 +225,38 @@ ceiling entirely.
   server never becomes a bottleneck on a 360-card set page.
 - First-load JS is 103–112 kB across every route.
 
+### Continuous integration
+
+Two lanes, because they answer different questions.
+
+**`CI`** runs on every pull request and on pushes to `main`. It is deterministic: a
+PostgreSQL 16 service container, the eleven migrations, and an ingest of the pinned
+snapshot with `SETVALUE_PROVIDER_OFFLINE=1`, which turns any request that would leave
+the runner into an error rather than a silent network call. Then the full 226-test
+suite, a production build, a real server, the browser end-to-end run and the HTTP
+concurrency harness. Nothing in it depends on a third party being healthy.
+
+The snapshot is a capture of real provider data, not synthesized, which is why the
+integrity assertions keep their meaning offline — 174 sets, 20,444 cards, >85% USD price
+coverage, no reverse holos before Legendary Collection are all statements about what the
+providers actually published.
+
+**`Live provider data`** runs on a schedule and on demand. It fetches from the catalog
+repository and the pokemontcg.io price API for real, ingests that, and runs the same
+battery against it. This is where the snapshot going stale shows up, and where a
+provider outage shows up. It is deliberately not a required PR check: the price API
+returns HTTP 500 on individual sets from time to time, which is a fact about a third
+party rather than a fact about a pull request.
+
+Price ingest tolerates a set the provider cannot serve — it records the failure, finishes
+the sync run as `partial`, and leaves those cards unpriced rather than guessed at. One
+bad set does not discard the other 173.
+
+Both lanes end by writing to the job summary what they did *not* verify: Supabase Auth
+(no credentials, so the wrong-password check reports `BLOCKED` rather than passing),
+pg_cron scheduling (absent from the stock image), the Supavisor pooler, and the
+5,001-collector load harness. A green tick should not be read as more coverage than it is.
+
 ### Abuse resistance
 
 - Rate limits are stored in the database (`rate_limits`) and incremented and read in one
@@ -343,7 +380,7 @@ the one part of the collector loop that is stubbed, and it is stubbed *out*, not
 
 **Price history begins at first ingest.** Provider `updatedAt` stamps span years, but
 that is one reading per card, not a series. Change detection requires two readings of
-the same printing — run `npm run snapshot:prices` daily.
+the same printing — run `npm run prices:refresh` daily.
 
 **No live partner inventory.** The schema, the demand query and the console are built;
 no partner API keys are issued in this environment, so no real shop inventory is loaded.
