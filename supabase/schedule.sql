@@ -45,7 +45,11 @@ begin
   );
 end $$;
 
-revoke all on function public.invoke_edge_function(text, jsonb) from public;
+-- Revoked from the API roles as well as PUBLIC: on hosted Supabase, default
+-- privileges grant EXECUTE to anon/authenticated on every new public function,
+-- so `from public` alone would leave this — which speaks with the project's
+-- service-role key — reachable by anonymous traffic. See migration 0014.
+revoke all on function public.invoke_edge_function(text, jsonb) from public, anon, authenticated;
 -- No grant follows. pg_cron runs these jobs as the role that scheduled them —
 -- the owner — which needs no grant. Nothing else has any business calling it.
 
