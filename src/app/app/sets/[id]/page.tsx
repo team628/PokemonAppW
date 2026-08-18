@@ -27,7 +27,7 @@ export default async function SetPage({
   const mode: GoalMode =
     (['main', 'complete', 'master'] as const).find((m) => m === sp.mode) ?? 'main';
 
-  const { set, slots, goal } = await withIdentity(user.id, async (tx) => {
+  const { set, slots, goal, displayName } = await withIdentity(user.id, async (tx) => {
     const set = await tx.one<{
       id: string; name: string; series: string; printed_total: number;
       release_date: string | null; logo_url: string | null; symbol_url: string | null;
@@ -36,7 +36,7 @@ export default async function SetPage({
        from public.sets where id = $1`,
       [id],
     );
-    if (!set) return { set: null, slots: [], goal: null };
+    if (!set) return { set: null, slots: [], goal: null, displayName: null };
 
     // One round trip: every required slot with its price and owned quantity.
     const rows = await tx.rows<{
@@ -50,7 +50,12 @@ export default async function SetPage({
       'select id from public.set_goals where set_id = $1 and mode = $2',
       [id, mode],
     );
-    return { set, slots: rows, goal };
+    // Only so a completion card can name who finished the set.
+    const me = await tx.one<{ display_name: string }>(
+      'select display_name from public.profiles where id = $1::uuid',
+      [user.id],
+    );
+    return { set, slots: rows, goal, displayName: me?.display_name ?? null };
   });
 
   if (!set) notFound();
@@ -224,6 +229,14 @@ export default async function SetPage({
           setId={id}
           mode={mode}
           slots={grid}
+          identity={{
+            setId: set.id,
+            setName: set.name,
+            series: set.series,
+            logoUrl: set.logo_url,
+            mode,
+            collector: displayName,
+          }}
           initialFilter={sp.filter === 'missing' ? 'missing' : sp.filter === 'owned' ? 'owned' : 'all'}
         />
 

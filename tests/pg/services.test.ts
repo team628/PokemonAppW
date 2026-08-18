@@ -169,6 +169,35 @@ describe('milestones', () => {
     expect(n).toBe(1);
   });
 
+  it('carries everything a completion card needs, and only on the transition', async () => {
+    await reset();
+    await addGoal(me, fx.setId, 'main');
+    for (const [c, v] of [[1, 'normal'], [2, 'normal'], [3, 'holofoil']] as const) {
+      await addToCollection(me, { cardId: card(c), variant: v });
+    }
+    await syncMilestonesForSet(me, fx.setId);
+
+    const complete = (await unseenMilestones(me)).find((m) => m.kind === 'complete');
+    expect(complete, 'finishing a set must produce a completion milestone').toBeTruthy();
+
+    // The card names the set out of context and dates the accomplishment.
+    expect(complete!.set_id).toBe(fx.setId);
+    expect(complete!.set_name).toBeTruthy();
+    expect(complete!.mode).toBe('main');
+    expect(complete!.collector).toBeTruthy();
+    expect(complete!.completed_at, 'the completion date is what makes it an artefact').toBeTruthy();
+    const payload = complete!.payload as Record<string, number>;
+    expect(payload.requiredCount).toBe(3);
+    expect(payload.completeCents).toBeGreaterThan(0);
+
+    // Seeing it once retires it. Re-reading — a second page load — must not
+    // replay the moment.
+    await markMilestonesSeen(me);
+    expect((await unseenMilestones(me)).map((m) => m.kind)).not.toContain('complete');
+    await syncMilestonesForSet(me, fx.setId);
+    expect((await unseenMilestones(me)).map((m) => m.kind)).not.toContain('complete');
+  });
+
   it('stamps the goal as completed when the last card lands', async () => {
     await reset();
     const goalId = await addGoal(me, fx.setId, 'main');

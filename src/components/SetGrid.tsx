@@ -8,6 +8,8 @@ import type { GoalMode } from '@/lib/domain/goals';
 import { CardArt } from './CardArt';
 import { NeedFigure } from './NeedFigure';
 import { useWindowedGrid } from './useWindowed';
+import { CompletionMoment } from './CompletionMoment';
+import type { CompletionCardData } from './CompletionCard';
 
 export interface GridSlot {
   cardId: string;
@@ -42,11 +44,14 @@ export function SetGrid({
   setId,
   mode,
   slots: initial,
+  identity,
   initialFilter = 'all',
 }: {
   setId: string;
   mode: GoalMode;
   slots: GridSlot[];
+  /** Enough set identity to draw a completion card the instant it is earned. */
+  identity: Omit<CompletionCardData, 'cardCount' | 'completedAt' | 'completeCents'>;
   initialFilter?: Filter;
 }) {
   const [slots, setSlots] = useState(initial);
@@ -64,6 +69,7 @@ export function SetGrid({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const gridRef = useRef<HTMLUListElement>(null);
+  const [completed, setCompleted] = useState<CompletionCardData | null>(null);
 
   const visible = useMemo(() => {
     const list = optimistic.filter((s) =>
@@ -115,7 +121,8 @@ export function SetGrid({
             withMode: mode,
           }),
         });
-        if (!res.ok) throw new Error((await res.json()).error ?? 'Request failed');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Request failed');
         setSlots((prev) =>
           prev.map((s) =>
             s.cardId === slot.cardId && s.variant === slot.variant
@@ -123,14 +130,34 @@ export function SetGrid({
               : s,
           ),
         );
+        // The set finishing under your thumb is the moment the whole product
+        // exists for, so it happens here rather than on the next page load. The
+        // server decides whether it happened: `milestones` only carries
+        // 'complete' on the transition, because the database inserts that row
+        // once per goal.
+        if (Array.isArray(data.milestones) && data.milestones.includes('complete')) {
+          setCompleted({
+            ...identity,
+            cardCount: data.metrics?.requiredCount ?? optimistic.length,
+            completeCents: data.metrics?.completeCents ?? 0,
+            completedAt: new Date().toISOString(),
+          });
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not save that change.');
       }
     });
   }
 
+  function closeCompletion() {
+    setCompleted(null);
+    // Shown once. Without this the dashboard would replay it on the next load.
+    fetch('/api/milestones/seen', { method: 'POST' }).catch(() => {});
+  }
+
   return (
     <div className="mt-4">
+      {completed && <CompletionMoment data={completed} onDismiss={closeCompletion} />}
       {/* Compact enough to leave the cards visible while scrolling, and every
           control sits within one-handed reach of the bottom of the screen. */}
       <div className="sticky top-[57px] z-20 -mx-4 border-b border-ink-line bg-ink/95 px-4 py-2.5 backdrop-blur-lg">

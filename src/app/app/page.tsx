@@ -39,13 +39,28 @@ export default async function Dashboard() {
 
   const milestones: MilestonePayload[] = milestoneRows.map((m) => {
     const p = (m.payload ?? {}) as Record<string, number>;
+    const requiredCount = p.requiredCount ?? 0;
     return {
       kind: m.kind as MilestoneKind,
       setName: m.set_name,
-      percent: p.requiredCount ? (p.ownedCount ?? 0) / p.requiredCount : 0,
+      percent: requiredCount ? (p.ownedCount ?? 0) / requiredCount : 0,
       ownedCount: p.ownedCount ?? 0,
-      requiredCount: p.requiredCount ?? 0,
+      requiredCount,
       completeCents: p.completeCents ?? 0,
+      // The completion card is drawn from the milestone the database recorded,
+      // so it says what was true at the moment the set was finished rather than
+      // what happens to be true now.
+      completion: {
+        setId: m.set_id,
+        setName: m.set_name,
+        series: m.series,
+        logoUrl: m.logo_url,
+        cardCount: requiredCount,
+        mode: m.mode,
+        completedAt: m.completed_at ?? m.achieved_at,
+        completeCents: p.completeCents ?? 0,
+        collector: m.collector,
+      },
     };
   });
 

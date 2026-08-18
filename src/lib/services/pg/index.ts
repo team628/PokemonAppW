@@ -131,7 +131,13 @@ export interface MilestoneRow {
   goal_id: string;
   kind: MilestoneKind;
   achieved_at: string;
+  set_id: string;
   set_name: string;
+  series: string | null;
+  logo_url: string | null;
+  mode: GoalMode;
+  completed_at: string | null;
+  collector: string | null;
   payload: Record<string, unknown> | null;
 }
 
@@ -190,11 +196,28 @@ export async function syncMilestonesForSet(userId: string, setId: string): Promi
 export async function unseenMilestones(userId: string): Promise<MilestoneRow[]> {
   return withIdentity(userId, (tx) =>
     tx.rows<MilestoneRow>(
-      `select m.goal_id, m.kind, m.achieved_at, s.name as set_name, m.payload
+      // Enough set identity to draw a completion card without a second read:
+      // a finished set has to be nameable out of context.
+      `select m.goal_id, m.kind, m.achieved_at::text, m.payload,
+              s.id as set_id, s.name as set_name, s.series, s.logo_url,
+              g.mode::text, g.completed_at::text,
+              (select display_name from public.profiles p where p.id = g.user_id) as collector
        from public.milestones m
        join public.set_goals g on g.id = m.goal_id
        join public.sets s on s.id = g.set_id
-       where not m.seen order by m.achieved_at desc limit 5`,
+       where not m.seen
+       -- Significance first, then recency. A set finishing fires eight
+       -- milestones in the same instant, and a plain "newest five" ordering
+       -- could drop the completion — the one moment that must never be lost —
+       -- because the timestamps tie.
+       order by case m.kind
+                  when 'complete' then 0
+                  when 'one_left' then 1
+                  when 'final_five' then 2
+                  else 3
+                end,
+                m.achieved_at desc
+       limit 5`,
     ),
   );
 }
