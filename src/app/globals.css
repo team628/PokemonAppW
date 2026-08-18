@@ -148,15 +148,6 @@ body {
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.28));
 }
 
-/* Offscreen card tiles skip rendering and layout entirely. A master set is
-   500+ slots; this keeps scrolling smooth without unmounting anything, so
-   selectors, focus order and optimistic state all behave exactly as before.
-   The intrinsic size is the tile's real height, so the scrollbar never jumps. */
-.tile-cv {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 176px;
-}
-
 .dim {
   filter: grayscale(1) brightness(0.42) contrast(0.9);
 }

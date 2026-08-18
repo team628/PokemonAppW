@@ -7,6 +7,7 @@ import { VARIANT_LABEL, VARIANT_SHORT, type Variant } from '@/lib/catalog/varian
 import type { GoalMode } from '@/lib/domain/goals';
 import { CardArt } from './CardArt';
 import { NeedFigure } from './NeedFigure';
+import { useWindowedGrid } from './useWindowed';
 
 export interface PullSlot {
   cardId: string;
@@ -183,6 +184,7 @@ export function ShowMode({
   );
 
   const flushRef = useRef(false);
+  const pullRef = useRef<HTMLUListElement>(null);
   const rejectedRef = useRef<RejectedFind[]>([]);
 
   const flush = useCallback(async () => {
@@ -269,6 +271,10 @@ export function ShowMode({
       (s) => s.number.toLowerCase().startsWith(q) || s.name.toLowerCase().includes(q),
     );
   }, [slots, hunt]);
+
+  // The pull list for a master-set hunt runs to hundreds of rows, each with its
+  // own artwork. Only the rows near the viewport are in the document.
+  const pullWindow = useWindowedGrid(pullRef, visibleSlots.length, hunt);
 
   return (
     <div className="pb-4">
@@ -409,11 +415,13 @@ export function ShowMode({
               </>
             )}
           </p>
-          <ul className="space-y-2">
-            {visibleSlots.map((s) => (
+          <ul ref={pullRef} style={pullWindow.style} className="grid grid-cols-1 gap-2">
+            {visibleSlots.slice(pullWindow.start, pullWindow.end).map((s, i) => (
               <li
                 key={`${s.cardId}-${s.variant}`}
-                className="tile-cv panel flex items-center gap-3 p-2.5"
+                aria-setsize={visibleSlots.length}
+                aria-posinset={pullWindow.start + i + 1}
+                className="panel flex items-center gap-3 p-2.5"
               >
                 <div className="w-[52px] shrink-0">
                   <CardArt src={s.imageSmall} alt={s.name} label={`#${s.number}`} />

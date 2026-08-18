@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useOptimistic, useState, useTransition } from 'react';
+import { useMemo, useOptimistic, useRef, useState, useTransition } from 'react';
 import { money } from '@/lib/pricing/quote';
 import { VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
 import { CardArt } from './CardArt';
 import { NeedFigure } from './NeedFigure';
+import { useWindowedGrid } from './useWindowed';
 
 export interface GridSlot {
   cardId: string;
@@ -62,6 +63,7 @@ export function SetGrid({
   const [sort, setSort] = useState<Sort>('number');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const gridRef = useRef<HTMLUListElement>(null);
 
   const visible = useMemo(() => {
     const list = optimistic.filter((s) =>
@@ -76,6 +78,11 @@ export function SetGrid({
     else sorted.sort((a, b) => a.numberSort - b.numberSort || a.variant.localeCompare(b.variant));
     return sorted;
   }, [optimistic, filter, sort]);
+
+  // Only the rows near the viewport are in the document. A master set is 400+
+  // slots; without this the browser lays out every one of them before the first
+  // card paints, and every ownership toggle reconciles the whole grid.
+  const window_ = useWindowedGrid(gridRef, visible.length, `${filter}:${sort}`);
 
   const live = useMemo(() => {
     const owned = optimistic.filter((s) => s.owned);
@@ -202,9 +209,18 @@ export function SetGrid({
             : 'No cards match this filter yet.'}
         </p>
       ) : (
-        <ul className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {visible.map((s) => (
-            <li key={`${s.cardId}-${s.variant}`} className="tile-cv">
+        <ul
+          ref={gridRef}
+          style={window_.style}
+          aria-label={`${visible.length} cards`}
+          className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7"
+        >
+          {visible.slice(window_.start, window_.end).map((s, i) => (
+            <li
+              key={`${s.cardId}-${s.variant}`}
+              aria-setsize={visible.length}
+              aria-posinset={window_.start + i + 1}
+            >
               <button
                 onClick={() => toggle(s)}
                 disabled={pending}
