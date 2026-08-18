@@ -206,7 +206,7 @@ export function CollectionView({ data }: { data: CollectionPageData }) {
         </div>
       ) : (
         <>
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0 xl:grid-cols-3">
             {data.rows.map((h) => (
               <Row key={h.id} h={h} />
             ))}

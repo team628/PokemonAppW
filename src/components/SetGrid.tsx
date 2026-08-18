@@ -160,7 +160,7 @@ export function SetGrid({
       {completed && <CompletionMoment data={completed} onDismiss={closeCompletion} />}
       {/* Compact enough to leave the cards visible while scrolling, and every
           control sits within one-handed reach of the bottom of the screen. */}
-      <div className="sticky top-[57px] z-20 -mx-4 border-b border-ink-line bg-ink/95 px-4 py-2.5 backdrop-blur-lg">
+      <div className="sticky top-[57px] z-20 -mx-4 border-b border-ink-line bg-ink/95 px-4 py-2.5 backdrop-blur-lg lg:mx-0 lg:rounded-xl lg:border lg:border-ink-line">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <NeedFigure

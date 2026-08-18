@@ -99,10 +99,12 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
         subtitle={`#${card.number} · ${card.set_name}`}
         back={`/app/sets/${card.set_id}`}
       />
-      <main className="pb-8">
+      {/* The card is the subject, so at `lg` it gets real size and stays put
+          while the reader works down the numbers beside it. */}
+      <main className="pb-8 lg:grid lg:grid-cols-[380px_minmax(0,1fr)] lg:items-start lg:gap-10 lg:pt-6">
         {/* ------------------------------------------------------- the card */}
-        <section className="relative px-4 pt-4">
-          <div className="mx-auto w-[62%] max-w-[260px]">
+        <section className="relative px-4 pt-4 lg:sticky lg:top-[76px] lg:px-0 lg:pt-0">
+          <div className="mx-auto w-[62%] max-w-[260px] lg:w-full lg:max-w-none">
             <div className="overflow-hidden rounded-2xl shadow-lift">
               <CardArt
                 src={card.image_large ?? card.image_small}
@@ -113,8 +115,8 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
-          <div className="mt-5 text-center">
-            <h2 className="text-xl font-extrabold leading-tight">{card.name}</h2>
+          <div className="mt-5 text-center lg:text-left">
+            <h2 className="text-xl font-extrabold leading-tight lg:text-2xl">{card.name}</h2>
             <p className="num mt-1 text-[11px] text-ink-mute">
               #{card.number}
               {card.printed_total ? `/${card.printed_total}` : ''} · {card.rarity ?? 'unknown rarity'}
@@ -136,8 +138,9 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
           </div>
         </section>
 
+        <div className="min-w-0">
         {/* ---------------------------------------------------- price moves */}
-        <section className="mt-6 px-4">
+        <section className="mt-6 px-4 lg:mt-0 lg:px-0">
           {series.length >= 2 ? (
             <div className="panel px-4 py-3.5">
               <div className="flex items-baseline justify-between">
@@ -165,7 +168,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
         </section>
 
         {/* ------------------------------------------------------- printings */}
-        <section className="mt-6 px-4">
+        <section className="mt-6 px-4 lg:px-0">
           <h3 className="label mb-2">Printings you can own</h3>
           <ul className="space-y-2">
             {variants.map((v) => {
@@ -240,7 +243,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
         </section>
 
         {goalsNeeding.length > 0 && (
-          <section className="mt-6 px-4">
+          <section className="mt-6 px-4 lg:px-0">
             <h3 className="label mb-2">Counts toward</h3>
             <ul className="flex flex-wrap gap-2">
               {goalsNeeding.map((g) => (
@@ -255,13 +258,14 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
         )}
 
         {(card.artist || card.flavor_text) && (
-          <section className="mt-6 px-4">
+          <section className="mt-6 px-4 lg:px-0">
             <Disclosure summary="About this card">
               {card.artist && <>Illustrated by {card.artist}. </>}
               {card.flavor_text}
             </Disclosure>
           </section>
         )}
+        </div>
       </main>
     </>
   );

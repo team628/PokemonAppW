@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { money } from '@/lib/pricing/quote';
 import type { Variant } from '@/lib/catalog/variants';
 import { CardArt } from './CardArt';
@@ -31,6 +31,11 @@ export interface BinderSlot {
  * through a 400-card set is legible without turning a single page.
  *
  * Only the open page is rendered, so pocket count and set size cost nothing.
+ *
+ * On a wide screen the binder opens: two facing pages, the way it sits on a
+ * table, and a page turn moves the spread rather than a single sheet. That is
+ * the one place this view should not simply be the phone layout made larger —
+ * a real binder is two pages, and a desktop has room for both.
  */
 export function BinderPages({
   slots,
@@ -45,6 +50,17 @@ export function BinderPages({
   const [page, setPage] = useState(0);
   const [missingOnly, setMissingOnly] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null);
+  const [spread, setSpread] = useState(false);
+
+  // Two facing pages once there is room for them. Read from the same breakpoint
+  // the layout uses, so the two can never disagree.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const sync = () => setSpread(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
 
   const source = useMemo(
     () => (missingOnly ? slots.filter((s) => !s.owned) : slots),
@@ -57,17 +73,22 @@ export function BinderPages({
     return out.length ? out : [[]];
   }, [source, pocket]);
 
+  const step = spread ? 2 : 1;
   const safePage = Math.min(page, pages.length - 1);
-  const current = pages[safePage] ?? [];
+  // The left-hand sheet of a spread is always the even page, so turning back
+  // and forth does not shuffle which cards face each other.
+  const firstPage = spread ? safePage - (safePage % 2) : safePage;
+  const openPages = spread
+    ? [firstPage, firstPage + 1].filter((i) => i < pages.length)
+    : [safePage];
   const cols = pocket === 4 ? 2 : pocket === 12 ? 4 : 3;
-  const filled = current.filter((s) => s.owned).length;
   const gapValue = useMemo(
     () => source.filter((s) => !s.owned).reduce((t, s) => t + (s.marketCents ?? 0), 0),
     [source],
   );
 
   function turn(delta: number) {
-    setPage((p) => Math.max(0, Math.min(pages.length - 1, p + delta)));
+    setPage((p) => Math.max(0, Math.min(pages.length - 1, p + delta * step)));
   }
 
   return (
@@ -104,7 +125,7 @@ export function BinderPages({
 
       {/* ------------------------------------------------------- the sheet */}
       <div
-        className="panel-raise select-none p-3"
+        className="panel-raise select-none p-3 lg:p-5"
         onTouchStart={(e) => {
           const t = e.touches[0]!;
           touch.current = { x: t.clientX, y: t.clientY };
@@ -120,48 +141,70 @@ export function BinderPages({
           touch.current = null;
         }}
       >
-        <div className="mb-2.5 flex items-baseline justify-between">
-          <p className="text-[13px] font-bold">
-            Page {safePage + 1}
-            <span className="font-medium text-ink-mute"> / {pages.length}</span>
-          </p>
-          <p className="num text-[11px] text-ink-mute">
-            <span className={filled === current.length ? 'font-bold text-have' : ''}>{filled}</span>
-            /{current.length} pockets filled
-          </p>
-        </div>
-
-        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {current.map((s) => (
-            <Link
-              key={`${s.cardId}-${s.variant}`}
-              href={`/app/cards/${s.cardId}`}
-              className="group block"
-              aria-label={`${s.name} number ${s.number}, ${s.owned ? 'in collection' : 'missing'}`}
-            >
-              <div className={`pocket relative ${s.owned ? '' : 'pocket-empty'}`}>
-                {s.owned ? (
-                  <div className="absolute inset-[3px] overflow-hidden rounded-[5px] shadow-slot transition group-active:scale-[.97]">
-                    {/* The pocket caption already prints the number; a
-                        placeholder that repeated it said the number twice and
-                        the card's name not at all. */}
-                    <CardArt src={s.imageSmall} alt={s.name} owned />
-                  </div>
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                    <span className="num text-[11px] font-bold text-ink-dim">#{s.number}</span>
-                    <span className="rounded bg-need/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-need">
-                      Need
+        <div className="lg:flex lg:gap-6">
+          {openPages.map((index, seat) => {
+            const sheet = pages[index] ?? [];
+            const sheetFilled = sheet.filter((s) => s.owned).length;
+            return (
+              <div
+                key={index}
+                className={`min-w-0 flex-1 ${seat > 0 ? 'lg:border-l lg:border-ink-line lg:pl-6' : ''}`}
+              >
+                <div className="mb-2.5 flex items-baseline justify-between">
+                  <p className="text-[13px] font-bold">
+                    Page {index + 1}
+                    <span className="font-medium text-ink-mute"> / {pages.length}</span>
+                  </p>
+                  <p className="num text-[11px] text-ink-mute">
+                    <span className={sheetFilled === sheet.length ? 'font-bold text-have' : ''}>
+                      {sheetFilled}
                     </span>
-                  </div>
-                )}
+                    /{sheet.length} pockets filled
+                  </p>
+                </div>
+
+                <div
+                  className="grid gap-2 lg:gap-3"
+                  style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+                >
+                  {sheet.map((s) => (
+                    <Link
+                      key={`${s.cardId}-${s.variant}`}
+                      href={`/app/cards/${s.cardId}`}
+                      className="group block"
+                      aria-label={`${s.name} number ${s.number}, ${s.owned ? 'in collection' : 'missing'}`}
+                    >
+                      <div className={`pocket relative ${s.owned ? '' : 'pocket-empty'}`}>
+                        {s.owned ? (
+                          <div className="absolute inset-[3px] overflow-hidden rounded-[5px] shadow-slot transition group-active:scale-[.97]">
+                            {/* The pocket caption already prints the number; a
+                                placeholder that repeated it said the number
+                                twice and the card's name not at all. */}
+                            <CardArt src={s.imageSmall} alt={s.name} owned />
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                            <span className="num text-[11px] font-bold text-ink-dim">
+                              #{s.number}
+                            </span>
+                            <span className="rounded bg-need/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-need">
+                              Need
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="num mt-1 truncate text-center text-[10px] text-ink-mute lg:text-[11px]">
+                        #{s.number}
+                      </p>
+                    </Link>
+                  ))}
+                  {Array.from({ length: Math.max(0, pocket - sheet.length) }).map((_, i) => (
+                    <div key={`empty-${i}`} className="pocket opacity-40" aria-hidden />
+                  ))}
+                </div>
               </div>
-              <p className="num mt-1 truncate text-center text-[10px] text-ink-mute">#{s.number}</p>
-            </Link>
-          ))}
-          {Array.from({ length: Math.max(0, pocket - current.length) }).map((_, i) => (
-            <div key={`empty-${i}`} className="pocket opacity-40" aria-hidden />
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -178,9 +221,9 @@ export function BinderPages({
                 <button
                   onClick={() => setPage(i)}
                   aria-label={`Page ${i + 1}, ${Math.round(f * 100)}% filled`}
-                  aria-current={i === safePage ? 'true' : undefined}
+                  aria-current={openPages.includes(i) ? 'true' : undefined}
                   className={`flex h-7 w-[9px] items-end overflow-hidden rounded-full ${
-                    i === safePage ? 'bg-white/25 ring-1 ring-white/60' : 'bg-white/10'
+                    openPages.includes(i) ? 'bg-white/25 ring-1 ring-white/60' : 'bg-white/10'
                   }`}
                 >
                   <span
@@ -194,7 +237,7 @@ export function BinderPages({
         </ul>
         <button
           onClick={() => turn(1)}
-          disabled={safePage >= pages.length - 1}
+          disabled={(openPages[openPages.length - 1] ?? safePage) >= pages.length - 1}
           className="btn-ghost px-5"
           aria-label="Next page"
         >

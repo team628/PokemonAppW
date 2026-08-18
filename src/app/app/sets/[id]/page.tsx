@@ -99,7 +99,11 @@ export default async function SetPage({
         right={<TrackButton setId={id} mode={mode} tracked={!!goal} goalId={goal?.id} />}
       />
 
-      <main className="px-4 pb-8 pt-4">
+      {/* From `lg` the command deck stops scrolling away: the figures a
+          collector is working against stay pinned beside the grid instead of
+          disappearing off the top the way they have to on a phone. */}
+      <main className="px-4 pb-8 pt-4 lg:grid lg:grid-cols-[352px_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <div className="lg:sticky lg:top-[72px] lg:space-y-3">
         {/* ---------------------------------------------------- command deck */}
         <section className="panel-raise relative overflow-hidden">
           {set.logo_url && (
@@ -225,6 +229,9 @@ export default async function SetPage({
           </section>
         )}
 
+        </div>
+
+        <div className="min-w-0">
         <SetGrid
           setId={id}
           mode={mode}
@@ -259,6 +266,7 @@ export default async function SetPage({
               </>
             )}
           </Disclosure>
+        </div>
         </div>
       </main>
     </>

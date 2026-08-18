@@ -71,7 +71,7 @@ export default async function ProfilePage() {
   return (
     <>
       <TopBar title="Profile" back="/app" />
-      <main className="space-y-7 px-4 pb-8 pt-4">
+      <main className="space-y-7 px-4 pb-8 pt-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0 lg:px-0 [&>*]:lg:mt-0">
         {/* ------------------------------------------------------- identity */}
         <section className="panel-raise relative overflow-hidden">
           <div

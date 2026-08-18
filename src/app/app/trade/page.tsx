@@ -43,7 +43,10 @@ export default async function TradePage() {
             : 'No matches yet'
         }
       />
-      <main className="space-y-6 px-4 pb-8 pt-4">
+      {/* Two columns from `lg`: what is on offer beside what you can offer, so
+          both halves of a trade are on screen at once rather than a scroll
+          apart. */}
+      <main className="space-y-6 px-4 pb-8 pt-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0 lg:px-0">
         {goals.length === 0 ? (
           <Empty
             title="Track a set to find trades"
@@ -52,6 +55,7 @@ export default async function TradePage() {
           />
         ) : (
           <>
+            <div className="space-y-6">
             <section>
               <SectionTitle
                 action={
@@ -182,6 +186,7 @@ export default async function TradePage() {
                 </ul>
               </section>
             )}
+            </div>
           </>
         )}
 

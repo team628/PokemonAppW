@@ -103,7 +103,7 @@ export default async function PartnersPage({
   const biggestSet = bySet[0]?.wants ?? 0;
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-5 pb-16">
+    <main className="mx-auto w-full max-w-3xl px-5 pb-16 lg:max-w-6xl lg:px-8">
       <header className="flex items-center justify-between py-5">
         <Link href="/" className="text-base font-black tracking-tight">
           SET<span className="text-need">VALUE</span>
@@ -112,7 +112,7 @@ export default async function PartnersPage({
       </header>
 
       <section className="pt-4">
-        <h1 className="text-[2.4rem] font-black leading-[1.05] tracking-tight">
+        <h1 className="text-[2.4rem] font-black leading-[1.05] tracking-tight lg:text-[3.4rem]">
           Purchase intent,
           <br />
           before the purchase.
@@ -137,7 +137,7 @@ export default async function PartnersPage({
             what collectors would spend to close every open want right now
           </p>
 
-          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:gap-3">
             <Cell label="Wanted printings" value={openWants.toLocaleString()} />
             <Cell label="Open wants" value={totalDemand.toLocaleString()} />
             <Cell label="Active hunts" value={population.tracked.toLocaleString()} />
@@ -146,9 +146,13 @@ export default async function PartnersPage({
         </div>
       </section>
 
+      {/* Concentration and the ranked list answer the same question from two
+          angles, so a wide screen shows them together instead of one under the
+          other. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start lg:gap-10">
       {/* -------------------------------------------------- concentration */}
       {bySet.length > 0 && (
-        <section className="mt-8">
+        <section className="mt-8 lg:sticky lg:top-6">
           <SectionTitle>Where demand concentrates</SectionTitle>
           <p className="mb-3 text-[12px] text-ink-mute">
             The ten most wanted printings account for{' '}
@@ -193,7 +197,7 @@ export default async function PartnersPage({
             {/* The top of the list, as cards. */}
             <ul className="rail mb-3 flex gap-2.5 overflow-x-auto pb-1">
               {demand.slice(0, 12).map((d) => (
-                <li key={`art-${d.card_id}-${d.variant}`} className="w-[84px] shrink-0">
+                <li key={`art-${d.card_id}-${d.variant}`} className="w-[84px] shrink-0 lg:w-[108px]">
                   <CardArt src={d.image_small} alt={d.name} label={`#${d.number}`} />
                   <p className="num mt-1 truncate text-[10px] font-bold text-need">
                     {d.collectors} want{d.collectors === 1 ? '' : 's'}
@@ -225,6 +229,8 @@ export default async function PartnersPage({
           </>
         )}
       </section>
+
+      </div>
 
       <section className="mt-10">
         <SectionTitle>How partners plug in</SectionTitle>

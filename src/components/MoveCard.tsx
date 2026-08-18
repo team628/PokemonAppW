@@ -78,12 +78,12 @@ export function MoveCard({ move, primary = false }: { move: Move; primary?: bool
                   marketCents: e.cents,
                   owned: false,
                 }}
-                width="w-[62px]"
+                width="w-[62px] lg:w-[82px]"
                 href={`/app/cards/${e.cardId}`}
                 showPrice={!e.note}
               />
               {e.note && (
-                <p className="num mt-0.5 w-[62px] truncate text-[10px] font-semibold text-have">
+                <p className="num mt-0.5 w-[62px] truncate text-[10px] font-semibold text-have lg:w-[82px]">
                   {e.note}
                 </p>
               )}

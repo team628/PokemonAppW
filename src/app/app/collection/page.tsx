@@ -144,7 +144,7 @@ export default async function CollectionPage({
   return (
     <>
       <TopBar title="Collection" subtitle={`${summary.totalCards.toLocaleString()} cards`} />
-      <main className="px-4 pb-8 pt-4">
+      <main className="px-4 pb-8 pt-4 lg:px-0">
         {summary.totalCards === 0 ? (
           <Link href="/app/import" className="panel mb-3 block px-4 py-3.5">
             <p className="text-sm font-semibold">Already track your collection somewhere else?</p>
@@ -154,6 +154,10 @@ export default async function CollectionPage({
           </Link>
         ) : (
           <>
+            {/* The deck and the two rankings answer different questions, so at
+                `lg` they sit beside each other rather than one below the next. */}
+            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-8">
+            <div>
             {/* ------------------------------------------------ command deck */}
             <section className="panel-raise relative overflow-hidden">
               <div
@@ -214,7 +218,7 @@ export default async function CollectionPage({
                           imageSmall: c.image_small,
                           marketCents: c.cents,
                         }}
-                        width="w-[78px]"
+                        width="w-[78px] lg:w-[104px]"
                         href={`/app/cards/${c.card_id}`}
                       />
                     </li>
@@ -223,9 +227,11 @@ export default async function CollectionPage({
               </section>
             )}
 
+            </div>
+
             {/* ----------------------------------------------- composition */}
             {deck.sets.length > 0 && (
-              <section className="mt-6">
+              <section className="mt-6 lg:mt-0">
                 <SectionTitle>Where the value sits</SectionTitle>
                 <ul className="space-y-1.5">
                   {deck.sets.map((s) => (
@@ -255,6 +261,7 @@ export default async function CollectionPage({
                 </ul>
               </section>
             )}
+            </div>
           </>
         )}
 

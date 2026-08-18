@@ -66,12 +66,13 @@ export default async function Dashboard() {
 
   return (
     <>
-      <header className="flex items-center justify-between px-4 pb-3 pt-5">
+      <header className="flex items-center justify-between px-4 pb-3 pt-5 lg:px-0 lg:pt-8">
         <div>
           <p className="text-[10px] uppercase tracking-[.18em] text-ink-mute">{greeting()}</p>
-          <Link href="/" className="text-lg font-black tracking-tight">
+          <Link href="/" className="text-lg font-black tracking-tight lg:hidden">
             SET<span className="text-need">VALUE</span>
           </Link>
+          <p className="hidden text-lg font-black tracking-tight lg:block">Your sets</p>
         </div>
         <Link
           href="/app/profile"
@@ -82,7 +83,10 @@ export default async function Dashboard() {
         </Link>
       </header>
 
-      <main className="space-y-7 px-4 pb-6">
+      {/* Two columns from `lg`: the hunt on the left, the standings on the
+          right. On a phone they stack in the same order they read. */}
+      <main className="px-4 pb-6 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8 lg:px-0">
+        <div className="space-y-7">
         {hero ? (
           <GoalHero view={hero} />
         ) : (
@@ -120,7 +124,7 @@ export default async function Dashboard() {
                       marketCents: c.marketCents,
                       owned: false,
                     }}
-                    width="w-[78px]"
+                    width="w-[78px] lg:w-[104px]"
                     href={`/app/cards/${c.cardId}`}
                   />
                 </li>
@@ -158,6 +162,9 @@ export default async function Dashboard() {
           </section>
         )}
 
+        </div>
+
+        <div className="mt-7 space-y-7 lg:mt-0">
         {others.length > 0 && (
           <section>
             <SectionTitle
@@ -227,6 +234,7 @@ export default async function Dashboard() {
           <Link href="/app/binder" className="btn-ghost">
             Binder view
           </Link>
+        </div>
         </div>
       </main>
 

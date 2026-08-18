@@ -68,7 +68,10 @@ export function CardTile({
 
   if (href) {
     return (
-      <Link href={href} className={`${width} shrink-0 transition active:scale-[.97]`}>
+      // `block`, because an anchor is inline by default and an inline box
+      // ignores a width — which is why these tiles rendered at 34px on a
+      // desktop rail instead of the width they were given.
+      <Link href={href} className={`${width} block shrink-0 transition active:scale-[.97]`}>
         {body}
       </Link>
     );

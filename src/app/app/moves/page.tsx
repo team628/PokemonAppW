@@ -19,8 +19,8 @@ export default async function MovesPage({
       <TopBar title="Next Best Move"
         subtitle={`${insights.moves.length} ranked option${insights.moves.length === 1 ? '' : 's'}`}
         back="/app" />
-      <main className="px-4 pb-8 pt-4">
-        <form className="panel mb-4 flex items-end gap-2 px-3.5 py-3" action="/app/moves">
+      <main className="px-4 pb-8 pt-4 lg:px-0">
+        <form className="panel mb-4 flex items-end gap-2 px-3.5 py-3 lg:max-w-sm" action="/app/moves">
           <div className="flex-1">
             <label className="label" htmlFor="budget">Budget (optional)</label>
             <input id="budget" name="budget" type="number" inputMode="decimal" step="1" min="0"
@@ -35,7 +35,7 @@ export default async function MovesPage({
             body="Next Best Move works from tracked sets and current prices. Track a set and recommendations appear immediately."
             action={{ href: '/app/sets', label: 'Track a set' }} />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
             {insights.moves.map((m, i) => (
               <MoveCard key={`${m.kind}-${m.goalId ?? i}`} move={m} primary={i === 0} />
             ))}
