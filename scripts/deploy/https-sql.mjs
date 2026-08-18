@@ -46,28 +46,57 @@ export function inline(sql, params = []) {
  * than fetch, so it inherits the proxy's CA exactly as every other HTTPS call in
  * this project does.
  */
+// The Management query endpoint is rate limited — it is meant for occasional
+// queries, not a bulk ingest. A minimum spacing between requests keeps a long
+// run (the catalog is ~180 statements) under that limit. Off by default so
+// migrations and the gate run at full speed; the ingest sets it.
+const MIN_INTERVAL_MS = Number(process.env.SETVALUE_HTTPS_MIN_INTERVAL_MS || 0);
+let lastCall = 0;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export async function query(sql, params = []) {
+  if (MIN_INTERVAL_MS > 0) {
+    const wait = lastCall + MIN_INTERVAL_MS - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastCall = Date.now();
+  }
   const body = JSON.stringify({ query: inline(sql, params) });
-  const out = execFileSync(
-    'curl',
-    [
-      '-s', '--max-time', '180', '-X', 'POST', ENDPOINT,
-      '-H', `Authorization: Bearer ${TOKEN}`,
-      '-H', 'Content-Type: application/json',
-      '--data-binary', '@-',
-    ],
-    { input: body, maxBuffer: 256 * 1024 * 1024 },
-  ).toString();
-  let parsed;
-  try {
-    parsed = JSON.parse(out);
-  } catch {
-    throw new Error(`non-JSON response: ${out.slice(0, 400)}`);
+  for (let attempt = 0; ; attempt++) {
+    const out = execFileSync(
+      'curl',
+      [
+        '-s', '--max-time', '180', '-X', 'POST', ENDPOINT,
+        '-H', `Authorization: Bearer ${TOKEN}`,
+        '-H', 'Content-Type: application/json',
+        '--data-binary', '@-',
+      ],
+      { input: body, maxBuffer: 256 * 1024 * 1024 },
+    ).toString();
+    let parsed;
+    try {
+      parsed = JSON.parse(out);
+    } catch {
+      // A non-JSON body is a gateway error (502/504 HTML) or an empty reply —
+      // transient. Back off and retry rather than failing the run.
+      if (attempt < 6) {
+        await sleep(2000 * 2 ** attempt);
+        lastCall = Date.now();
+        continue;
+      }
+      throw new Error(`non-JSON response after retries: ${out.replace(/\s+/g, ' ').slice(0, 200)}`);
+    }
+    if (parsed && !Array.isArray(parsed) && parsed.message) {
+      // The endpoint is rate limited. Back off and retry rather than losing a
+      // long ingest to one throttled request.
+      if (/too many requests|throttl/i.test(parsed.message) && attempt < 6) {
+        await sleep(2000 * 2 ** attempt);
+        lastCall = Date.now();
+        continue;
+      }
+      throw new Error(parsed.message);
+    }
+    return Array.isArray(parsed) ? parsed : [];
   }
-  if (parsed && !Array.isArray(parsed) && parsed.message) {
-    throw new Error(parsed.message);
-  }
-  return Array.isArray(parsed) ? parsed : [];
 }
 
 /**

@@ -80,7 +80,17 @@ async function insertBatch(
     rows = [...seen.values()];
   }
   const perRow = columns.length;
-  const maxRows = Math.max(1, Math.floor(60_000 / perRow));
+  // The default keeps each statement under PostgreSQL's 65535-parameter cap.
+  // A transport that inlines values instead of binding them — the HTTPS query
+  // endpoint used for deployment, where there is no parameter cap but there is
+  // a request-body size limit — sets SETVALUE_INGEST_BATCH_ROWS to a smaller
+  // number so each statement stays inside that limit. Row-for-row output is
+  // identical either way; only how many rows share one INSERT changes.
+  const cap = Number(
+    (typeof process !== 'undefined' && process.env?.SETVALUE_INGEST_BATCH_ROWS) || 0,
+  );
+  const maxRows =
+    cap > 0 ? Math.max(1, cap) : Math.max(1, Math.floor(60_000 / perRow));
   let written = 0;
 
   for (let i = 0; i < rows.length; i += maxRows) {
