@@ -3,47 +3,30 @@ import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth/session';
 import { withIdentity } from '@/lib/db/pg';
 import { TopBar } from '@/components/AppShell';
-import { SourceNote } from '@/components/ui';
+import { Disclosure, Sparkline } from '@/components/ui';
 import { money, euros, daysSince, STALE_AFTER_DAYS } from '@/lib/pricing/quote';
 import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
 import { CardActions } from '@/components/CardActions';
+import { CardArt } from '@/components/CardArt';
 
 export const dynamic = 'force-dynamic';
 
 interface CardRow {
-  id: string;
-  set_id: string;
-  set_name: string;
-  printed_total: number;
-  number: string;
-  name: string;
-  rarity: string | null;
-  artist: string | null;
-  flavor_text: string | null;
-  image_small: string | null;
-  image_large: string | null;
-  is_secret: boolean;
+  id: string; set_id: string; set_name: string; printed_total: number; number: string;
+  name: string; rarity: string | null; artist: string | null; flavor_text: string | null;
+  image_small: string | null; image_large: string | null; is_secret: boolean;
 }
 
 interface PriceRow {
-  variant: string;
-  provider: string;
-  currency: string;
-  low_cents: number | null;
-  mid_cents: number | null;
-  high_cents: number | null;
-  market_cents: number | null;
-  direct_cents: number | null;
-  observed_on: string;
+  variant: string; provider: string; currency: string;
+  low_cents: number | null; mid_cents: number | null; high_cents: number | null;
+  market_cents: number | null; direct_cents: number | null; observed_on: string;
 }
 
 export default async function CardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
 
-  // One round trip under one identity. The collection and goal reads are RLS
-  // scoped to the caller; the catalog reads are the shared, world-readable
-  // tables — the same query would return the same card for anyone.
   const data = await withIdentity(user.id, async (tx) => {
     const card = await tx.one<CardRow>(
       `select c.id, c.set_id, s.name as set_name, s.printed_total, c.number, c.name, c.rarity,
@@ -71,17 +54,18 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
          where user_id = $1::uuid and card_id = $2 group by variant`,
         [user.id, id],
       ),
-      tx.rows<{ observed_on: string }>(
-        `select distinct observed_on::text from public.price_points
+      // Every dated reading for this card, for the history chart.
+      tx.rows<{ variant: string; observed_on: string; market_cents: number }>(
+        `select variant, observed_on::text, market_cents from public.price_points
          where card_id = $1 and provider = 'tcgplayer' and market_cents is not null
-         order by observed_on desc limit 40`,
+         order by observed_on asc`,
         [id],
       ),
       tx.rows<{ id: string; mode: string; name: string }>(
         `select g.id, g.mode::text, s.name from public.set_goals g
          join public.sets s on s.id = g.set_id
          where g.user_id = $1::uuid and g.set_id = $2`,
-        [user.id, card.set_id],
+        [user.id, id],
       ),
     ]);
 
@@ -89,11 +73,24 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
   });
 
   if (!data) notFound();
-  const { card, variants, prices, owned, goalsNeeding } = data;
+  const { card, variants, prices, owned, history, goalsNeeding } = data;
 
   const ownedByVariant = new Map<string, number>();
   for (const o of owned) ownedByVariant.set(o.variant, (ownedByVariant.get(o.variant) ?? 0) + o.qty);
-  const observationDates = data.history.map((h) => h.observed_on);
+  const totalOwned = [...ownedByVariant.values()].reduce((a, b) => a + b, 0);
+
+  const primary = variants[0]?.variant ?? 'normal';
+  const headline =
+    prices.find((p) => p.variant === primary && p.provider === 'tcgplayer') ??
+    prices.find((p) => p.provider === 'tcgplayer');
+  const headlineCents =
+    headline?.market_cents ?? headline?.mid_cents ?? headline?.low_cents ?? null;
+
+  const series = history
+    .filter((h) => h.variant === primary)
+    .map((h) => ({ on: h.observed_on, cents: h.market_cents }));
+  const change =
+    series.length >= 2 ? series[series.length - 1]!.cents - series[0]!.cents : null;
 
   return (
     <>
@@ -102,86 +99,110 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
         subtitle={`#${card.number} · ${card.set_name}`}
         back={`/app/sets/${card.set_id}`}
       />
-      <main className="px-4 pb-8 pt-4">
-        <div className="flex gap-4">
-          <div className="w-[42%] shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={card.image_large ?? card.image_small ?? ''}
-              alt={card.name}
-              className="w-full rounded-xl"
-            />
+      <main className="pb-8">
+        {/* ------------------------------------------------------- the card */}
+        <section className="relative px-4 pt-4">
+          <div className="mx-auto w-[62%] max-w-[260px]">
+            <div className="overflow-hidden rounded-2xl shadow-lift">
+              <CardArt
+                src={card.image_large ?? card.image_small}
+                alt={card.name}
+                label={`#${card.number}`}
+                priority
+              />
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold leading-tight">{card.name}</h2>
-            <p className="num mt-0.5 text-xs text-ink-mute">
+
+          <div className="mt-5 text-center">
+            <h2 className="text-xl font-extrabold leading-tight">{card.name}</h2>
+            <p className="num mt-1 text-[11px] text-ink-mute">
               #{card.number}
               {card.printed_total ? `/${card.printed_total}` : ''} · {card.rarity ?? 'unknown rarity'}
+              {card.is_secret && ' · secret'}
             </p>
-            {card.artist && <p className="mt-1 text-xs text-ink-mute">Illus. {card.artist}</p>}
-            {card.is_secret && (
-              <span className="chip mt-2 border-gold/40 text-gold">Secret rare</span>
-            )}
-            {card.flavor_text && (
-              <p className="mt-3 border-l-2 border-ink-line pl-3 text-xs italic leading-relaxed text-ink-mute">
-                {card.flavor_text}
+
+            <p className="figure mt-3 text-[2.6rem]">
+              {headlineCents === null ? <span className="text-ink-dim">—</span> : money(headlineCents)}
+            </p>
+            <p className="text-[10px] font-bold uppercase tracking-[.18em] text-ink-mute">
+              {headlineCents === null ? 'No market price' : 'Market price'}
+            </p>
+
+            {totalOwned > 0 && (
+              <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-have/15 px-3 py-1 text-[11px] font-bold text-have">
+                In your collection · {totalOwned} cop{totalOwned === 1 ? 'y' : 'ies'}
               </p>
             )}
           </div>
-        </div>
+        </section>
 
-        <section className="mt-6">
-          <h3 className="label mb-2">Printings &amp; market</h3>
+        {/* ---------------------------------------------------- price moves */}
+        <section className="mt-6 px-4">
+          {series.length >= 2 ? (
+            <div className="panel px-4 py-3.5">
+              <div className="flex items-baseline justify-between">
+                <p className="label">Price history</p>
+                <p className={`num text-[12px] font-bold ${change! >= 0 ? 'text-have' : 'text-need'}`}>
+                  {change! >= 0 ? '+' : '−'}
+                  {money(Math.abs(change!))} since {series[0]!.on}
+                </p>
+              </div>
+              <Sparkline points={series} className="mt-2 h-12" />
+              <p className="num mt-1 flex justify-between text-[10px] text-ink-mute">
+                <span>{series[0]!.on}</span>
+                <span>
+                  {series.length} readings · {series[series.length - 1]!.on}
+                </span>
+              </p>
+            </div>
+          ) : (
+            <p className="text-[11px] text-ink-mute">
+              SetValue holds {series.length} dated reading{series.length === 1 ? '' : 's'} for this
+              printing. A chart needs at least two, so there is nothing to plot yet — and one
+              reading is not a trend.
+            </p>
+          )}
+        </section>
+
+        {/* ------------------------------------------------------- printings */}
+        <section className="mt-6 px-4">
+          <h3 className="label mb-2">Printings you can own</h3>
           <ul className="space-y-2">
             {variants.map((v) => {
               const tcg = prices.find((p) => p.variant === v.variant && p.provider === 'tcgplayer');
               const cm = prices.find((p) => p.variant === v.variant && p.provider === 'cardmarket');
               const value = tcg?.market_cents ?? tcg?.mid_cents ?? tcg?.low_cents ?? null;
-              const basis = tcg?.market_cents ? 'market' : tcg?.mid_cents ? 'mid listing' : tcg?.low_cents ? 'low listing' : null;
+              const basis = tcg?.market_cents
+                ? 'market'
+                : tcg?.mid_cents
+                  ? 'mid listing'
+                  : tcg?.low_cents
+                    ? 'low listing'
+                    : null;
               const qty = ownedByVariant.get(v.variant) ?? 0;
               const stale = tcg ? daysSince(tcg.observed_on) > STALE_AFTER_DAYS : false;
 
               return (
-                <li key={v.variant} className="panel px-3.5 py-3">
-                  <div className="flex items-start justify-between gap-3">
+                <li key={v.variant} className={`panel px-3.5 py-3 ${qty > 0 ? 'border-have/25' : ''}`}>
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold">
+                      <p className="text-[13px] font-bold">
                         {VARIANT_LABEL[v.variant]}
-                        {qty > 0 && <span className="ml-2 text-xs font-bold text-have">you own {qty}</span>}
+                        {qty > 0 && (
+                          <span className="num ml-2 rounded-full bg-have/15 px-2 py-0.5 text-[10px] font-black text-have">
+                            ×{qty}
+                          </span>
+                        )}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-ink-mute">
-                        {v.source === 'market_data'
-                          ? 'Confirmed by market listings'
-                          : 'Inferred from set era and rarity — no provider lists this printing separately'}
+                      <p className="mt-0.5 text-[10px] text-ink-mute">
+                        {v.source === 'market_data' ? 'Confirmed by listings' : 'Inferred printing'}
+                        {stale && <span className="text-gold"> · price is stale</span>}
                       </p>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <p className="num text-lg font-bold">{money(value)}</p>
-                      {basis && (
-                        <p className="text-[10px] text-ink-mute">
-                          {basis} · {tcg!.observed_on}
-                          {stale && <span className="text-gold"> · stale</span>}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {tcg && (
-                    <div className="num mt-2.5 grid grid-cols-4 gap-2 border-t border-ink-line pt-2.5 text-center text-[11px]">
-                      <Figure label="Low" cents={tcg.low_cents} />
-                      <Figure label="Mid" cents={tcg.mid_cents} />
-                      <Figure label="High" cents={tcg.high_cents} />
-                      <Figure label="Direct" cents={tcg.direct_cents} />
-                    </div>
-                  )}
-
-                  {cm && (
-                    <p className="mt-2 text-[11px] text-ink-mute">
-                      Cardmarket (EU): trend {euros(cm.market_cents)} · low {euros(cm.low_cents)} ·
-                      observed {cm.observed_on}. Shown for reference only — SetValue never converts
-                      currencies without a rate source, so this figure is not part of any total.
+                    <p className="num shrink-0 text-[17px] font-bold">
+                      {value === null ? <span className="text-ink-dim">—</span> : money(value)}
                     </p>
-                  )}
+                  </div>
 
                   <CardActions
                     cardId={id}
@@ -190,6 +211,28 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
                     setId={card.set_id}
                     mode={(goalsNeeding[0]?.mode as 'main' | 'complete' | 'master') ?? 'main'}
                   />
+
+                  <Disclosure summary="Price detail" className="mt-2.5">
+                    {tcg ? (
+                      <>
+                        TCGplayer {basis}, observed {tcg.observed_on}. Low {money(tcg.low_cents)} ·
+                        mid {money(tcg.mid_cents)} · high {money(tcg.high_cents)}
+                        {tcg.direct_cents !== null && <> · direct {money(tcg.direct_cents)}</>}.
+                      </>
+                    ) : (
+                      'No TCGplayer listing for this printing.'
+                    )}
+                    {cm && (
+                      <>
+                        {' '}
+                        Cardmarket (EU) trend {euros(cm.market_cents)}, observed {cm.observed_on} —
+                        shown for reference only. SetValue never converts currencies without a rate
+                        source, so this is not part of any total.
+                      </>
+                    )}
+                    {v.source === 'inferred' &&
+                      ' This printing is derived from the set’s era and rarity because no price provider lists it separately.'}
+                  </Disclosure>
                 </li>
               );
             })}
@@ -197,7 +240,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
         </section>
 
         {goalsNeeding.length > 0 && (
-          <section className="mt-6">
+          <section className="mt-6 px-4">
             <h3 className="label mb-2">Counts toward</h3>
             <ul className="flex flex-wrap gap-2">
               {goalsNeeding.map((g) => (
@@ -211,23 +254,15 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
           </section>
         )}
 
-        <SourceNote className="mt-6 border-t border-ink-line pt-4">
-          Prices come from TCGplayer (USD) and Cardmarket (EUR), republished by pokemontcg.io, with
-          each provider&apos;s own observation date shown above.{' '}
-          {observationDates.length < 2
-            ? `SetValue holds ${observationDates.length} dated reading for this card, which is not enough to describe a trend — so it does not claim one.`
-            : `SetValue holds ${observationDates.length} dated readings for this card, from ${observationDates[observationDates.length - 1]} to ${observationDates[0]}.`}
-        </SourceNote>
+        {(card.artist || card.flavor_text) && (
+          <section className="mt-6 px-4">
+            <Disclosure summary="About this card">
+              {card.artist && <>Illustrated by {card.artist}. </>}
+              {card.flavor_text}
+            </Disclosure>
+          </section>
+        )}
       </main>
     </>
-  );
-}
-
-function Figure({ label, cents }: { label: string; cents: number | null }) {
-  return (
-    <div>
-      <p className="text-ink-mute">{label}</p>
-      <p className="font-semibold">{cents === null ? '—' : money(cents)}</p>
-    </div>
   );
 }

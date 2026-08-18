@@ -207,10 +207,25 @@ export async function markMilestonesSeen(userId: string): Promise<void> {
 
 // ---------------------------------------------------------------- insights --
 
+/** One card the caller holds spare that the counterpart is missing. */
+export interface ReciprocalCard {
+  cardId: string;
+  name: string;
+  number: string;
+  imageSmall: string | null;
+  valueCents: number | null;
+}
+
+export type TradeMatch = TradeMatchInput & {
+  spareCopies: number;
+  /** Null when the match only runs one way. */
+  theirs: ReciprocalCard | null;
+};
+
 export interface Insights {
   goals: GoalView[];
   moves: Move[];
-  trades: (TradeMatchInput & { spareCopies: number })[];
+  trades: TradeMatch[];
   dupes: DupeInput[];
   drops: PriceDropInput[];
   historyTooShallow: boolean;
@@ -341,6 +356,8 @@ async function loadTradeMatches(
     card_id: string; variant: string; name: string; number: string;
     image_small: string | null; market_cents: number | null;
     handle: string | null; display_name: string | null; spare_copies: number; mutual: boolean;
+    my_card_id: string | null; my_name: string | null; my_number: string | null;
+    my_image_small: string | null; my_market_cents: number | null;
   }>('select * from public.trade_matches($1)', [60])).map((r) => ({
     cardId: r.card_id,
     name: r.name,
@@ -352,6 +369,16 @@ async function loadTradeMatches(
     counterpartDisplayName: r.display_name ?? 'A collector',
     mutual: r.mutual,
     spareCopies: r.spare_copies,
+    // The card of mine that fills a hole for them — the other half of the trade.
+    theirs: r.my_card_id
+      ? {
+          cardId: r.my_card_id,
+          name: r.my_name ?? '',
+          number: r.my_number ?? '',
+          imageSmall: r.my_image_small,
+          valueCents: r.my_market_cents,
+        }
+      : null,
   }));
 }
 
@@ -493,6 +520,23 @@ export async function demandMeta() {
        left join public.prices p on p.card_id=w.card_id and p.variant=w.variant and p.provider='tcgplayer'
        where w.collectors > 0`,
     ),
+  }));
+}
+
+/**
+ * Population totals for the partner console.
+ *
+ * Read under service_role rather than as an anonymous visitor. `profiles` and
+ * `set_goals` are owner-scoped by RLS — correctly, since neither should be
+ * browsable — so an anonymous count returns zero, and printing "0 collectors"
+ * next to seven figures of demand would be a wrong number, not a private one.
+ *
+ * What crosses the boundary is two integers: how many collectors exist and how
+ * many set goals exist. No row, id, handle or holding is read, and nothing here
+ * is attributable to anybody. The RLS policies themselves are untouched.
+ */
+export async function demandPopulation(): Promise<{ collectors: number; tracked: number }> {
+  return withServiceRole(async (tx) => ({
     collectors: (await tx.one<{ n: number }>('select count(*)::int as n from public.profiles'))!.n,
     tracked: (await tx.one<{ n: number }>('select count(*)::int as n from public.set_goals'))!.n,
   }));

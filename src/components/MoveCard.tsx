@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import { Money, SourceNote } from './ui';
-import { CardArt } from './CardArt';
+import { Disclosure, Money } from './ui';
+import { CardTile } from './CardTile';
 import type { Move } from '@/lib/domain/nextBestMove';
-import { VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
 
 const KIND_LABEL: Record<Move['kind'], string> = {
   finish_line: 'Finish line',
@@ -14,6 +13,20 @@ const KIND_LABEL: Record<Move['kind'], string> = {
   start_tracking: 'Get started',
 };
 
+const CTA: Partial<Record<Move['kind'], string>> = {
+  trade_match: 'See trades',
+  duplicate_leverage: 'Review duplicates',
+  start_tracking: 'Browse sets',
+};
+
+/**
+ * A recommendation, as a collector reads it.
+ *
+ * The cards come first, because "which cards" is the question. Then the money
+ * and the completion it buys. The reasoning is still fully available, but it
+ * sits behind a disclosure instead of being the tallest thing on the card —
+ * three of these used to fill a phone screen with prose.
+ */
 export function MoveCard({ move, primary = false }: { move: Move; primary?: boolean }) {
   const href =
     move.setId && move.goalId
@@ -26,60 +39,68 @@ export function MoveCard({ move, primary = false }: { move: Move; primary?: bool
 
   return (
     <article
-      className={`panel px-4 py-4 ${primary ? 'border-need/40 bg-gradient-to-b from-need/[0.07] to-transparent' : ''}`}
+      className={`panel overflow-hidden ${
+        primary ? 'border-need/35 bg-gradient-to-b from-need/[.06] to-transparent' : ''
+      }`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className={`chip ${primary ? 'border-need/40 text-need' : ''}`}>
-          {KIND_LABEL[move.kind]}
-        </span>
-        {move.costCents !== null && (
-          <span className="text-right">
-            <Money cents={move.costCents} approx className="block text-sm font-bold" />
-            {move.listingCount !== undefined && move.listingCount > 1 && (
-              <span className="num block text-[10px] text-ink-mute">
-                {move.listingCount} listings
-              </span>
-            )}
-          </span>
-        )}
+      <div className="px-4 pt-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <span className={`chip ${primary ? 'border-need/40 text-need' : ''}`}>
+              {KIND_LABEL[move.kind]}
+            </span>
+            <h3 className="mt-2 text-[15px] font-bold leading-snug">{move.headline}</h3>
+          </div>
+          {move.costCents !== null && (
+            <div className="shrink-0 text-right">
+              <Money cents={move.costCents} approx className="block text-[17px] font-bold" />
+              {move.deltaPoints > 0 && (
+                <span className="num mt-0.5 block text-[11px] font-bold text-have">
+                  +{move.deltaPoints.toFixed(1)} pts
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      <h3 className="mt-2.5 text-[15px] font-bold leading-snug">{move.headline}</h3>
-      <p className="mt-1 text-sm leading-relaxed text-ink-mute">{move.detail}</p>
-
       {move.evidence.length > 0 && (
-        <ul className="rail mt-3 flex gap-2 overflow-x-auto pb-1">
+        <ul className="rail mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
           {move.evidence.map((e) => (
-            <li key={`${e.cardId}-${e.variant}`} className="w-[64px] shrink-0">
-              <CardArt src={e.imageSmall} alt={e.name} label={`#${e.number}`} />
-              <p className="num mt-1 truncate text-[10px] text-ink-mute">
-                #{e.number}
-                {e.variant !== 'normal' && ` ${VARIANT_SHORT[e.variant as Variant] ?? ''}`}
-              </p>
-              <p className="num truncate text-[10px] font-semibold">
-                {e.note ?? <Money cents={e.cents} />}
-              </p>
+            <li key={`${e.cardId}-${e.variant}`} className="shrink-0">
+              <CardTile
+                card={{
+                  cardId: e.cardId,
+                  name: e.name,
+                  number: e.number,
+                  variant: e.variant,
+                  imageSmall: e.imageSmall,
+                  marketCents: e.cents,
+                  owned: false,
+                }}
+                width="w-[62px]"
+                href={`/app/cards/${e.cardId}`}
+                showPrice={!e.note}
+              />
+              {e.note && (
+                <p className="num mt-0.5 w-[62px] truncate text-[10px] font-semibold text-have">
+                  {e.note}
+                </p>
+              )}
             </li>
           ))}
         </ul>
       )}
 
-      <div className="mt-3 flex items-center gap-2">
-        <Link href={href} className={primary ? 'btn-need flex-1' : 'btn-ghost flex-1'}>
-          {move.kind === 'trade_match'
-            ? 'See trades'
-            : move.kind === 'duplicate_leverage'
-              ? 'Review duplicates'
-              : move.deltaPoints > 0
-                ? `Act on this (+${move.deltaPoints.toFixed(1)} pts)`
-                : 'Open'}
+      <div className="px-4 pb-3.5 pt-3">
+        <Link href={href} className={primary ? 'btn-need w-full' : 'btn-ghost w-full'}>
+          {CTA[move.kind] ?? 'Open'}
         </Link>
+        <Disclosure summary="Why this move" className="mt-3">
+          {move.detail} {move.basis}
+          {move.confidence === 'estimated' && ' These are estimates, not confirmed sales.'}
+        </Disclosure>
       </div>
-
-      <SourceNote className="mt-3 border-t border-ink-line pt-2.5">
-        {move.basis}
-        {move.confidence === 'estimated' && ' Figures here are estimates, not confirmed sales.'}
-      </SourceNote>
     </article>
   );
 }

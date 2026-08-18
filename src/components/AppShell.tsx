@@ -23,7 +23,7 @@ export function BottomNav() {
   const path = usePathname();
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-line bg-ink/95 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-line bg-ink/95 backdrop-blur-lg"
       style={{ paddingBottom: 'var(--safe-b)' }}
       aria-label="Primary"
     >
@@ -58,7 +58,10 @@ export function BottomNav() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-2xl pb-24">
+    <div
+      className="mx-auto min-h-dvh w-full max-w-2xl"
+      style={{ paddingBottom: 'calc(var(--nav-h) + 1rem)' }}
+    >
       {children}
       <BottomNav />
     </div>
@@ -77,7 +80,7 @@ export function TopBar({
   back?: string;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-ink-line bg-ink/95 px-4 py-3 backdrop-blur">
+    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-ink-line bg-ink/95 px-4 py-3 backdrop-blur-lg">
       {back && (
         <Link
           href={back}

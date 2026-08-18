@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
+import { VARIANT_LABEL, VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
 import { CardArt } from './CardArt';
+import { NeedFigure } from './NeedFigure';
 
 export interface PullSlot {
   cardId: string;
@@ -84,6 +85,7 @@ export function ShowMode({
   const [online, setOnline] = useState(true);
   const [flash, setFlash] = useState<{ name: string; saved: number | null } | null>(null);
   const [priceFor, setPriceFor] = useState<PullSlot | null>(null);
+  const [hunt, setHunt] = useState('');
   const activeSet = sets.find((s) => s.id === setId);
   const mode: GoalMode = activeSet?.mode ?? 'main';
 
@@ -259,21 +261,30 @@ export function ShowMode({
     [slots],
   );
 
+  // Narrowing a 300-card hunt by number or name, without leaving the list.
+  const visibleSlots = useMemo(() => {
+    const q = hunt.trim().toLowerCase();
+    if (!q) return slots;
+    return slots.filter(
+      (s) => s.number.toLowerCase().startsWith(q) || s.name.toLowerCase().includes(q),
+    );
+  }, [slots, hunt]);
+
   return (
     <div className="pb-4">
       {/* running tally — the number that makes the session feel like progress */}
-      <div className="panel sticky top-[57px] z-20 mb-4 px-4 py-3">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="label">Still need{activeSet ? ` · ${activeSet.name}` : ''}</p>
-            <p className="num text-3xl font-black leading-none text-need">{money(needCents)}</p>
-            <p className="num mt-1 text-[11px] text-ink-mute">{missingCount} cards left</p>
+      <div className="panel sticky top-[57px] z-20 mb-3 px-4 py-2.5">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="label truncate">Still need{activeSet ? ` · ${activeSet.name}` : ''}</p>
+            <NeedFigure cents={needCents} className="block text-[27px] text-need" />
+            <p className="num mt-0.5 text-[11px] text-ink-mute">{missingCount} cards left</p>
           </div>
-          <div className="text-right">
+          <div className="shrink-0 text-right">
             <p className="label">This hunt</p>
-            <p className="num text-lg font-bold">{summary.finds} found</p>
-            <p className="num text-[11px] text-ink-mute">
-              {money(summary.spentCents)} spent · {money(summary.marketCents)} market
+            <p className="num text-[17px] font-bold">{summary.finds} found</p>
+            <p className="num text-[10px] text-ink-mute">
+              {money(summary.spentCents)} spent
             </p>
           </div>
         </div>
@@ -369,33 +380,72 @@ export function ShowMode({
         </div>
       ) : (
         <>
+          {/* Digging through a box is a number-order job, so the list stays in
+              number order and the filter narrows rather than reorders. */}
+          <div className="mb-2.5 flex items-center gap-2">
+            <input
+              value={hunt}
+              onChange={(e) => setHunt(e.target.value)}
+              inputMode="search"
+              type="search"
+              placeholder="Jump to a number or name…"
+              aria-label="Filter the pull list"
+              className="field py-2.5 text-[15px]"
+            />
+            {hunt && (
+              <button onClick={() => setHunt('')} className="btn-quiet shrink-0">
+                Clear
+              </button>
+            )}
+          </div>
           <p className="mb-2 text-[11px] text-ink-mute">
-            Sorted by card number so it tracks the order cards sit in a binder or box.{' '}
-            {money(listValue)} buys this whole list at the lowest current listings.
+            {visibleSlots.length === slots.length ? (
+              <>
+                {slots.length} to find · {money(listValue)} at the lowest listings
+              </>
+            ) : (
+              <>
+                {visibleSlots.length} of {slots.length} shown
+              </>
+            )}
           </p>
           <ul className="space-y-2">
-            {slots.map((s) => (
-              <li key={`${s.cardId}-${s.variant}`} className="panel flex items-center gap-3 p-2.5">
+            {visibleSlots.map((s) => (
+              <li
+                key={`${s.cardId}-${s.variant}`}
+                className="tile-cv panel flex items-center gap-3 p-2.5"
+              >
                 <div className="w-[52px] shrink-0">
                   <CardArt src={s.imageSmall} alt={s.name} label={`#${s.number}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{s.name}</p>
-                  <p className="num text-[11px] text-ink-mute">
+                  <p className="num text-[11px] font-bold text-ink-mute">
                     #{s.number}
-                    {s.variant !== 'normal' && ` · ${VARIANT_LABEL[s.variant]}`}
-                    {s.rarity && ` · ${s.rarity}`}
+                    {s.variant !== 'normal' && (
+                      <span className="ml-1 text-gold">{VARIANT_SHORT[s.variant]}</span>
+                    )}
                   </p>
-                  <p className="num mt-0.5 text-xs font-semibold text-need">
-                    {s.marketCents === null ? 'no market price' : `${money(s.marketCents)} market`}
-                    {s.acquisitionCents !== null && s.acquisitionCents !== s.marketCents && (
-                      <span className="text-ink-mute"> · from {money(s.acquisitionCents)}</span>
+                  <p className="truncate text-[14px] font-bold leading-tight">{s.name}</p>
+                  {/* Market is what it is worth; the second figure is what it
+                      would actually cost to buy today. Repeating the market
+                      price as "need impact" would have said nothing new — the
+                      tally above already falls by exactly that much. */}
+                  <p className="num mt-0.5 text-[12px] font-semibold">
+                    {s.marketCents === null ? (
+                      <span className="text-ink-dim">no market price</span>
+                    ) : (
+                      <>
+                        {money(s.marketCents)}
+                        {s.acquisitionCents !== null && s.acquisitionCents !== s.marketCents && (
+                          <span className="text-have"> · from {money(s.acquisitionCents)}</span>
+                        )}
+                      </>
                     )}
                   </p>
                 </div>
                 <button
                   onClick={() => setPriceFor(s)}
-                  className="btn-need min-h-[52px] shrink-0 px-4 text-xs"
+                  className="btn-need min-h-[62px] w-[86px] shrink-0 px-0 text-[13px] font-black leading-tight"
                   aria-label={`Mark ${s.name} number ${s.number} as found`}
                 >
                   FOUND IT

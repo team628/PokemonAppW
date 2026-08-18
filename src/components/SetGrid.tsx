@@ -6,6 +6,7 @@ import { money } from '@/lib/pricing/quote';
 import { VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
 import { CardArt } from './CardArt';
+import { NeedFigure } from './NeedFigure';
 
 export interface GridSlot {
   cardId: string;
@@ -122,40 +123,56 @@ export function SetGrid({
   }
 
   return (
-    <div>
-      <div className="sticky top-[57px] z-20 -mx-4 border-b border-ink-line bg-ink/95 px-4 py-3 backdrop-blur">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="num text-2xl font-black leading-none text-need">{money(live.need)}</p>
-            <p className="text-[10px] font-bold uppercase tracking-[.18em] text-need/80">
-              {live.unpricedMissing > 0 ? 'To go (at least)' : 'To go'}
+    <div className="mt-4">
+      {/* Compact enough to leave the cards visible while scrolling, and every
+          control sits within one-handed reach of the bottom of the screen. */}
+      <div className="sticky top-[57px] z-20 -mx-4 border-b border-ink-line bg-ink/95 px-4 py-2.5 backdrop-blur-lg">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <NeedFigure
+              cents={live.need}
+              className={`block text-[22px] ${live.missingCount === 0 ? 'text-have' : 'text-need'}`}
+            />
+            <p className="num text-[10px] text-ink-mute">
+              {live.missingCount === 0
+                ? 'set complete'
+                : live.unpricedMissing > 0
+                  ? 'left · at least'
+                  : 'left to complete'}{' '}
+              · {live.missingCount} left
             </p>
           </div>
-          <div className="text-right">
-            <p className="num text-sm font-bold">{(live.percent * 100).toFixed(1)}%</p>
-            <p className="num text-[11px] text-ink-mute">
-              {live.ownedCount}/{live.required} · {live.missingCount} left
+          <div className="shrink-0 text-right">
+            <p className="num text-[13px] font-bold">{(live.percent * 100).toFixed(1)}%</p>
+            <p className="num text-[10px] text-ink-mute">
+              {live.ownedCount}/{live.required}
             </p>
           </div>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[.08]">
           <div
-            className="h-full rounded-full bg-need transition-[width] duration-300"
+            className={`h-full rounded-full transition-[width] duration-500 ease-out ${
+              live.missingCount === 0 ? 'bg-have' : 'bg-need'
+            }`}
             style={{ width: `${live.percent * 100}%` }}
           />
         </div>
 
-        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto">
+        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto">
           {(['all', 'missing', 'owned'] as Filter[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               aria-pressed={filter === f}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                filter === f ? 'bg-white text-ink' : 'border border-ink-line text-ink-mute'
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                filter === f ? 'chip-active' : 'border border-ink-line text-ink-mute'
               }`}
             >
-              {f === 'all' ? `All ${live.required}` : f === 'missing' ? `Missing ${live.missingCount}` : `Have ${live.ownedCount}`}
+              {f === 'all'
+                ? `All ${live.required}`
+                : f === 'missing'
+                  ? `Missing ${live.missingCount}`
+                  : `Have ${live.ownedCount}`}
             </button>
           ))}
           <span className="ml-auto shrink-0" />
@@ -163,7 +180,7 @@ export function SetGrid({
             value={sort}
             onChange={(e) => setSort(e.target.value as Sort)}
             aria-label="Sort cards"
-            className="shrink-0 rounded-full border border-ink-line bg-ink px-2.5 py-1.5 text-xs text-ink-mute"
+            className="shrink-0 rounded-full border border-ink-line bg-ink px-2.5 py-1.5 text-[11px] text-ink-mute"
           >
             <option value="number">By number</option>
             <option value="value">Most valuable</option>
@@ -187,7 +204,7 @@ export function SetGrid({
       ) : (
         <ul className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
           {visible.map((s) => (
-            <li key={`${s.cardId}-${s.variant}`}>
+            <li key={`${s.cardId}-${s.variant}`} className="tile-cv">
               <button
                 onClick={() => toggle(s)}
                 disabled={pending}
@@ -203,7 +220,7 @@ export function SetGrid({
                 {s.owned && (
                   <span
                     aria-hidden
-                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-have text-[11px] font-black text-ink shadow"
+                    className="absolute right-1 top-1 flex h-5 w-5 animate-seat items-center justify-center rounded-full bg-have text-[11px] font-black text-ink shadow-slot"
                   >
                     ✓
                   </span>

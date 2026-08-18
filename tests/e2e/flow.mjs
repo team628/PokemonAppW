@@ -47,6 +47,12 @@ const dollars = (text) => {
 const browser = await chromium.launch(EXEC ? { executablePath: EXEC } : {});
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } }); // iPhone-sized
 
+// Every assertion in this suite is about DOM content, never about artwork.
+// Waiting on the load event would make the run hostage to the image CDN, so
+// navigations settle on DOMContentLoaded instead.
+const gotoOnce = page.goto.bind(page);
+page.goto = (url, opts) => gotoOnce(url, { waitUntil: 'domcontentloaded', ...opts });
+
 try {
   const email = `e2e-${Date.now()}@example.com`;
 
@@ -155,7 +161,7 @@ try {
     ['/app/journey', 'journey'],
     ['/app/binder', 'binder'],
     ['/app/moves', 'Next Best Move'],
-    ['/app/profile', 'Where the numbers come from'],
+    ['/app/profile', 'Data & pricing'],
   ]) {
     await page.goto(`${BASE}${path}`);
     const text = await page.locator('body').innerText();
