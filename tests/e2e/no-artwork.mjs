@@ -82,6 +82,7 @@ const SET = 'sv3pt5';
  * convenient path locally but spends the sign-up rate limit CI has to share.
  */
 async function ensureCollector(label, cards = 0) {
+  let needsSet = true;
   if (!COOKIE) {
     await page.goto(`${BASE}/signup`);
     await page.fill('#displayName', label);
@@ -90,10 +91,13 @@ async function ensureCollector(label, cards = 0) {
     await page.click('button:has-text("Create account")');
     await page.waitForURL('**/onboarding', { timeout: 20000 });
   } else {
+    // The dashboard's empty state is the reliable "no goals" signal; onboarding
+    // itself looks the same whether or not the collector already tracks sets.
     await page.goto(`${BASE}/app`);
+    needsSet = /Pick a set to chase/i.test(await page.locator('main').innerText());
   }
 
-  if (/Pick a set to chase/i.test(await page.locator('main').innerText())) {
+  if (needsSet) {
     await page.goto(`${BASE}/onboarding`);
     await page.fill('input[aria-label="Search sets"]', '151');
     await page.waitForTimeout(400);
