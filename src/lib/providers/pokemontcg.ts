@@ -15,11 +15,33 @@ import type {
  * is present (`data/raw`, populated by scripts/fetch-*.mjs) so ingest is
  * reproducible and CI does not depend on a third party being up; otherwise it
  * calls the API directly.
+ *
+ * This module is shared: it runs under Node (the app, CI, the ingest scripts)
+ * and under Deno (the Supabase Edge Functions). Deno's edge runtime does not
+ * expose a `process` global, so environment and working-directory access go
+ * through the two helpers below rather than touching `process` directly — which
+ * would throw at module load under Deno. Under Node the helpers resolve to
+ * `process.env` / `process.cwd()` exactly as before.
  */
 
+/** Read an environment variable in whichever runtime this is loaded in. */
+function env(name: string): string | undefined {
+  const g = globalThis as {
+    Deno?: { env?: { get(k: string): string | undefined } };
+    process?: { env?: Record<string, string | undefined> };
+  };
+  return g.Deno?.env?.get(name) ?? g.process?.env?.[name];
+}
+
+/** The working directory, or '.' where there is none (a bundled Edge Function). */
+function cwd(): string {
+  const g = globalThis as { process?: { cwd?: () => string } };
+  return g.process?.cwd ? g.process.cwd() : '.';
+}
+
 const CATALOG_BASE = 'https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master';
-const API_BASE = process.env.POKEMONTCG_API_BASE ?? 'https://api.pokemontcg.io/v2';
-const MIRROR = path.join(process.cwd(), 'data', 'raw');
+const API_BASE = env('POKEMONTCG_API_BASE') ?? 'https://api.pokemontcg.io/v2';
+const MIRROR = path.join(cwd(), 'data', 'raw');
 
 /**
  * Offline mode. When set, any request that would leave the machine is an error
@@ -31,7 +53,7 @@ const MIRROR = path.join(process.cwd(), 'data', 'raw');
  * exists to remove.
  */
 function offline(): boolean {
-  return process.env.SETVALUE_PROVIDER_OFFLINE === '1';
+  return env('SETVALUE_PROVIDER_OFFLINE') === '1';
 }
 
 async function getJson<T>(url: string, tries = 5): Promise<T> {
@@ -44,7 +66,7 @@ async function getJson<T>(url: string, tries = 5): Promise<T> {
   for (let i = 0; i < tries; i++) {
     try {
       const headers: Record<string, string> = {};
-      if (process.env.POKEMONTCG_API_KEY) headers['X-Api-Key'] = process.env.POKEMONTCG_API_KEY;
+      const apiKey = env('POKEMONTCG_API_KEY'); if (apiKey) headers['X-Api-Key'] = apiKey;
       const res = await fetch(url, { headers, signal: AbortSignal.timeout(60_000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return (await res.json()) as T;
@@ -57,6 +79,10 @@ async function getJson<T>(url: string, tries = 5): Promise<T> {
 }
 
 function mirrored<T>(relative: string): T | null {
+  // No filesystem, no mirror: a bundled Edge Function has neither `process` nor
+  // `data/raw`, so it always fetches live. Returning early also keeps the
+  // node:fs calls below off the Deno path entirely.
+  if (!(globalThis as { process?: unknown }).process) return null;
   const p = path.join(MIRROR, relative);
   return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')) as T) : null;
 }
@@ -159,7 +185,7 @@ export const providers: Record<string, CardDataProvider> = {
 };
 
 export function activeProvider(): CardDataProvider {
-  const id = process.env.CARD_DATA_PROVIDER ?? pokemonTcgProvider.id;
+  const id = env('CARD_DATA_PROVIDER') ?? pokemonTcgProvider.id;
   const p = providers[id];
   if (!p) throw new Error(`unknown card data provider: ${id}`);
   return p;

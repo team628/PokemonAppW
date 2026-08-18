@@ -97,18 +97,33 @@ export function connect(url: string): Session {
 /**
  * The scheduler's credential check.
  *
- * pg_cron presents the service-role key as a bearer token, which is what
- * Supabase's own function invocations do. Compared in constant time so the
- * check cannot be turned into an oracle by timing it.
+ * These functions are deployed with the gateway's JWT verification on, so every
+ * request that reaches this code already carries a bearer token whose signature
+ * the platform validated against the project's JWT secret — a token only
+ * Supabase can mint. What the gateway does NOT do is distinguish roles: the
+ * anon key passes it too. So the one thing left to check is that the caller is
+ * the service role, which is what pg_cron presents when it invokes the function
+ * (it reads the service key from Vault; see schedule.sql).
+ *
+ * The role lives in the JWT's payload. Because the signature is already trusted,
+ * reading the payload without re-verifying it is sound: an attacker holding only
+ * the anon key gets a token whose role claim is `anon`, and cannot forge a
+ * valid-signature token that says `service_role`. Comparing an env-injected key
+ * byte-for-byte was the earlier approach and proved brittle across Supabase's
+ * legacy-JWT and new API-key formats; the role claim is the stable invariant.
  */
 export function authorized(req: Request): boolean {
-  const expected = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const header = req.headers.get('Authorization') ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!expected || token.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= token.charCodeAt(i) ^ expected.charCodeAt(i);
-  return diff === 0;
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  try {
+    const pad = parts[1].length % 4 === 0 ? '' : '='.repeat(4 - (parts[1].length % 4));
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/') + pad));
+    return payload.role === 'service_role';
+  } catch {
+    return false;
+  }
 }
 
 /** The database URL a function should use, preferring the pooler. */

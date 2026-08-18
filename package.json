@@ -2,7 +2,7 @@
   "name": "setvalue",
   "version": "0.1.0",
   "private": true,
-  "description": "SetValue \u2014 the Pokemon collector operating system",
+  "description": "SetValue — the Pokemon collector operating system",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -21,7 +21,8 @@
     "snapshot:restore": "node scripts/pg/snapshot.mjs restore",
     "snapshot:capture": "node scripts/pg/snapshot.mjs capture",
     "setup:live": "node scripts/fetch-catalog.mjs && node scripts/fetch-prices.mjs && npm run migrate && npm run ingest:catalog && npm run ingest:prices",
-    "prices:refresh": "./scripts/snapshot-prices.sh"
+    "prices:refresh": "./scripts/snapshot-prices.sh",
+    "deploy:functions": "node scripts/deploy/deploy-functions.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
