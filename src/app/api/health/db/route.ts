@@ -1,20 +1,29 @@
 import { getPool } from '@/lib/db/pg';
+import net from 'node:net';
+import tls from 'node:tls';
 
 /**
  * TEMPORARY diagnostic — production database connectivity probe.
  *
  * Added only to identify why the deployed app cannot open a database
- * connection (DB-backed pages return 500). It attempts the most trivial
- * possible query on the SAME pool the application uses, and reports whether it
- * succeeded plus a *sanitised* error classification.
+ * connection (DB-backed pages return 500). Two modes:
  *
- * It deliberately returns nothing that could be sensitive: no connection
- * string, host, port, username, password, SQL, or stack trace. Only:
- *   - ok:      boolean
- *   - code:    the short symbolic error code (e.g. ECONNREFUSED, 28P01) — never
- *              free text that could carry a host or credential
- *   - message: a first line with hosts, IPs, URIs and quoted identifiers
- *              stripped out
+ *   GET /api/health/db
+ *     Attempts `select 1` on the SAME pool the application uses and reports
+ *     { ok, code, message } with hosts, IPs, URIs, ports, and quoted
+ *     identifiers stripped from the message. No connection string,
+ *     credentials, SQL, or stack traces are exposed.
+ *
+ *   GET /api/health/db?capture=certs
+ *     Opens a raw TLS session to the pooler (Postgres SSLRequest handshake)
+ *     WITHOUT verifying the chain, purely to read the certificate chain the
+ *     server presents, and returns each certificate's subject/issuer and PEM.
+ *     X.509 certificates are public by definition — a server hands them to
+ *     every client during the handshake — so nothing secret is exposed. This
+ *     is how we learn which CA to pin so the app can then verify the chain
+ *     (rejectUnauthorized stays true in the app itself; this probe's
+ *     no-verify socket is used only to observe the public certificate and is
+ *     immediately discarded).
  *
  * REMOVE this route once the connection is fixed.
  */
@@ -25,26 +34,85 @@ export const dynamic = 'force-dynamic';
 function sanitize(raw: string): string {
   let s = raw.split('\n')[0]!.slice(0, 200);
   s = s
-    // full postgres URIs, should they ever appear
     .replace(/postgres(?:ql)?:\/\/\S+/gi, '[redacted-uri]')
-    // user@host forms
     .replace(/\S+@\S+/g, '[redacted]')
-    // any supabase / pooler / aws hostnames
     .replace(/[a-z0-9.-]*\.(?:supabase\.(?:co|com)|pooler\.supabase\.com|amazonaws\.com)/gi, '[redacted-host]')
-    // bare dotted hostnames (three+ labels) and IPv4 addresses
     .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[redacted-ip]')
     .replace(/\b(?:[a-z0-9-]+\.){2,}[a-z]{2,}\b/gi, '[redacted-host]')
-    // :port
     .replace(/:\d{2,5}\b/g, ':[port]')
-    // "quoted identifiers" such as user names
     .replace(/"[^"]*"/g, '"[redacted]"');
   return s;
 }
 
-export async function GET() {
+function derToPem(der: Buffer): string {
+  const b64 = der.toString('base64').replace(/(.{64})/g, '$1\n');
+  return `-----BEGIN CERTIFICATE-----\n${b64}\n-----END CERTIFICATE-----\n`;
+}
+
+/** Capture the certificate chain the pooler presents (public data). */
+async function captureCerts(): Promise<Response> {
+  const url = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? '';
+  let host = '';
+  let port = 6543;
+  try {
+    const u = new URL(url);
+    host = u.hostname;
+    port = Number(u.port || 6543);
+  } catch {
+    return Response.json({ ok: false, code: 'NO_DB_URL', message: 'no database url' }, { status: 503 });
+  }
+
+  return await new Promise<Response>((resolve) => {
+    const socket = net.connect({ host, port });
+    const done = (r: Response) => {
+      try { socket.destroy(); } catch { /* noop */ }
+      resolve(r);
+    };
+    const timer = setTimeout(() => done(Response.json({ ok: false, code: 'TIMEOUT', message: 'handshake timeout' }, { status: 503 })), 9000);
+
+    socket.on('error', (e: NodeJS.ErrnoException) =>
+      done(Response.json({ ok: false, code: e.code ?? 'SOCKET_ERR', message: 'socket error' }, { status: 503 })),
+    );
+
+    socket.once('connect', () => {
+      // Postgres SSLRequest: int32 length=8, int32 code=80877103.
+      const req = Buffer.from([0x00, 0x00, 0x00, 0x08, 0x04, 0xd2, 0x16, 0x2f]);
+      socket.write(req);
+    });
+
+    socket.once('data', (buf: Buffer) => {
+      if (buf[0] !== 0x53 /* 'S' */) {
+        return done(Response.json({ ok: false, code: 'NO_SSL', message: 'server declined SSL' }, { status: 503 }));
+      }
+      const secure = tls.connect({ socket, servername: host, rejectUnauthorized: false }, () => {
+        clearTimeout(timer);
+        const chain: { subject: string; issuer: string; pem: string }[] = [];
+        const seen = new Set<string>();
+        let cert = secure.getPeerCertificate(true) as tls.DetailedPeerCertificate | undefined;
+        while (cert && cert.raw && !seen.has(cert.fingerprint256)) {
+          seen.add(cert.fingerprint256);
+          const nameOf = (x: tls.PeerCertificate['subject']) =>
+            [x?.O, x?.CN].filter(Boolean).join(' / ') || '(unknown)';
+          chain.push({ subject: nameOf(cert.subject), issuer: nameOf(cert.issuer), pem: derToPem(cert.raw) });
+          if (cert.issuerCertificate && cert.issuerCertificate !== cert) cert = cert.issuerCertificate;
+          else break;
+        }
+        done(Response.json({ ok: true, code: 'OK', count: chain.length, chain }));
+      });
+      secure.on('error', (e: NodeJS.ErrnoException) => {
+        clearTimeout(timer);
+        done(Response.json({ ok: false, code: e.code ?? 'TLS_ERR', message: 'tls error' }, { status: 503 }));
+      });
+    });
+  });
+}
+
+export async function GET(req: Request) {
+  if (new URL(req.url).searchParams.get('capture') === 'certs') {
+    return captureCerts();
+  }
   const started = Date.now();
   try {
-    // A short race so the probe can never hang the function.
     const result = await Promise.race([
       getPool().query('select 1 as ok'),
       new Promise((_, reject) =>
