@@ -71,36 +71,68 @@ const artBoxes = () =>
  * on screen. Reported when empty rather than failed — and still checked when
  * they are not.
  */
-const MAY_BE_EMPTY = new Set(['/app/trade']);
-const empty = [];
+const SET = 'sv3pt5';
 
-try {
+/**
+ * Make sure the caller is a collector with something to look at.
+ *
+ * With a cookie — a minted local identity in CI, or the load dataset's whale
+ * locally — this tracks a set only if that collector has none, so a run against
+ * a populated database changes nothing. Without one it signs up, which is the
+ * convenient path locally but spends the sign-up rate limit CI has to share.
+ */
+async function ensureCollector(label, cards = 0) {
   if (!COOKIE) {
-    console.log('\nprovisioning a collector');
     await page.goto(`${BASE}/signup`);
-    await page.fill('#displayName', 'Offline');
-    await page.fill('#email', `offline-${Date.now()}@example.com`);
+    await page.fill('#displayName', label);
+    await page.fill('#email', `${label.toLowerCase()}-${Date.now()}@example.com`);
     await page.fill('#password', 'password-1234');
     await page.click('button:has-text("Create account")');
     await page.waitForURL('**/onboarding', { timeout: 20000 });
+  } else {
+    await page.goto(`${BASE}/app`);
+  }
+
+  if (/Pick a set to chase/i.test(await page.locator('main').innerText())) {
+    await page.goto(`${BASE}/onboarding`);
     await page.fill('input[aria-label="Search sets"]', '151');
     await page.waitForTimeout(400);
     await page.click('li:has-text("151") button >> nth=0');
     await page.click('button:has-text("Track 1 set")');
     await page.waitForURL(`${BASE}/app`, { timeout: 20000 });
-
-    // Enough holdings for the binder to have filled pockets and the collection
-    // to have rows — both are surfaces where a placeholder has to work.
-    await page.goto(`${BASE}/app/sets/sv3pt5`);
-    await page.waitForSelector('ul[aria-label$="cards"] li button[aria-pressed="false"]');
-    for (let i = 0; i < 10; i++) {
-      const next = page.locator('ul[aria-label$="cards"] li button[aria-pressed="false"]').first();
-      if (!(await next.count())) break;
-      await next.click();
-      await page.waitForTimeout(350);
-    }
-    check('provisioned a collector with cards to draw', true);
   }
+
+  if (cards > 0) {
+    await page.goto(`${BASE}/app/collection`);
+    await page.waitForTimeout(700);
+    if (/Already track your collection somewhere else/i.test(await page.locator('main').innerText())) {
+      await page.goto(`${BASE}/app/sets/${SET}`);
+      await page.waitForSelector('ul[aria-label$="cards"] li button[aria-pressed="false"]');
+      for (let i = 0; i < cards; i++) {
+        const next = page.locator('ul[aria-label$="cards"] li button[aria-pressed="false"]').first();
+        if (!(await next.count())) break;
+        await next.click();
+        await page.waitForTimeout(350);
+      }
+    }
+  }
+}
+
+const MAY_BE_EMPTY = new Set([
+  '/app/trade',
+  // The binder opens the collector's first tracked set, which they may own
+  // nothing of yet — every pocket is then an empty pocket and there is no
+  // artwork on the page to have a failure state.
+  '/app/binder',
+]);
+const empty = [];
+
+try {
+  console.log('\nprovisioning');
+  // Enough holdings for the binder to have filled pockets and the collection to
+  // have rows — both are surfaces where a placeholder has to work.
+  await ensureCollector('Offline', 10);
+  check('the caller is a collector with cards to draw', true);
 
   for (const path of [
     '/app',
@@ -198,14 +230,20 @@ try {
   );
   check('a pocket never prints its card number twice', dupes === 0, `${dupes} pockets`);
 
-  const named = await page.$$eval('main a:has(.pocket) .card-art', (els) =>
-    els.filter((e) => e.innerText.trim().length > 0).length,
-  );
-  check(
-    'a filled pocket with no artwork still names its card',
-    named > 0,
-    `${named} pockets name the card`,
-  );
+  const pockets = await page.locator('main a:has(.pocket) .card-art').count();
+  if (pockets === 0) {
+    console.log('  ---- this collector owns nothing in the set the binder opened');
+    empty.push('/app/binder pockets');
+  } else {
+    const named = await page.$$eval('main a:has(.pocket) .card-art', (els) =>
+      els.filter((e) => e.innerText.trim().length > 0).length,
+    );
+    check(
+      'a filled pocket with no artwork still names its card',
+      named === pockets,
+      `${named} of ${pockets} pockets name the card`,
+    );
+  }
 
   // ------------------------------------------------------- card show is usable
   console.log('\ncard show with no artwork');

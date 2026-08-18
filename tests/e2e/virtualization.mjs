@@ -58,25 +58,58 @@ await page.route('**/*', (route) => {
 
 const tiles = () => page.locator('ul[aria-label$="cards"] > li').count();
 
-try {
+/**
+ * Make sure the caller is a collector with something to look at.
+ *
+ * With a cookie — a minted local identity in CI, or the load dataset's whale
+ * locally — this tracks a set only if that collector has none, so a run against
+ * a populated database changes nothing. Without one it signs up, which is the
+ * convenient path locally but spends the sign-up rate limit CI has to share.
+ */
+async function ensureCollector(label, cards = 0) {
   if (!COOKIE) {
-    // No identity supplied: become a collector, so the run needs nothing but
-    // the catalog. Card Show mode needs a tracked set to build a pull list
-    // from, and the grid needs somewhere to write an ownership toggle.
-    console.log('\nprovisioning a collector');
     await page.goto(`${BASE}/signup`);
-    await page.fill('#displayName', 'Windowing');
-    await page.fill('#email', `windowing-${Date.now()}@example.com`);
+    await page.fill('#displayName', label);
+    await page.fill('#email', `${label.toLowerCase()}-${Date.now()}@example.com`);
     await page.fill('#password', 'password-1234');
     await page.click('button:has-text("Create account")');
     await page.waitForURL('**/onboarding', { timeout: 20000 });
+  } else {
+    await page.goto(`${BASE}/app`);
+  }
+
+  if (/Pick a set to chase/i.test(await page.locator('main').innerText())) {
+    await page.goto(`${BASE}/onboarding`);
     await page.fill('input[aria-label="Search sets"]', '151');
     await page.waitForTimeout(400);
     await page.click('li:has-text("151") button >> nth=0');
     await page.click('button:has-text("Track 1 set")');
     await page.waitForURL(`${BASE}/app`, { timeout: 20000 });
-    check('provisioned a collector tracking a large set', true);
   }
+
+  if (cards > 0) {
+    await page.goto(`${BASE}/app/collection`);
+    await page.waitForTimeout(700);
+    if (/Already track your collection somewhere else/i.test(await page.locator('main').innerText())) {
+      await page.goto(`${BASE}/app/sets/${SET}`);
+      await page.waitForSelector('ul[aria-label$="cards"] li button[aria-pressed="false"]');
+      for (let i = 0; i < cards; i++) {
+        const next = page.locator('ul[aria-label$="cards"] li button[aria-pressed="false"]').first();
+        if (!(await next.count())) break;
+        await next.click();
+        await page.waitForTimeout(350);
+      }
+    }
+  }
+}
+
+
+try {
+  console.log('\nprovisioning');
+  // Card Show mode needs a tracked set to build a pull list from, and the grid
+  // needs somewhere to write an ownership toggle.
+  await ensureCollector('Windowing');
+  check('the caller is a collector tracking at least one set', true);
 
   // ------------------------------------------------------------- the set grid
   console.log('\nset grid — a large master set');

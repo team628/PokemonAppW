@@ -61,7 +61,19 @@ async function run(reducedMotion) {
     await page.fill('#email', `complete-${Date.now()}-${reducedMotion ? 'r' : 'd'}@example.com`);
     await page.fill('#password', 'password-1234');
     await page.click('button:has-text("Create account")');
-    await page.waitForURL('**/onboarding', { timeout: 20000 });
+    await page.waitForURL('**/onboarding', { timeout: 20000 }).catch(async (e) => {
+      // This suite needs a collector who has never finished this set, so it
+      // signs up. Say so plainly when the sign-up limiter is what stopped it —
+      // the limiter working is not a failure of the thing under test.
+      const text = await page.locator('main').innerText().catch(() => '');
+      if (/Too many sign-ups|rate limit/i.test(text)) {
+        throw new Error(
+          'the sign-up rate limiter refused a new account — wait for the window ' +
+            'to pass, or run against a database whose signup bucket is clear',
+        );
+      }
+      throw e;
+    });
 
     await page.fill('input[aria-label="Search sets"]', 'Futsal');
     await page.waitForTimeout(400);

@@ -183,9 +183,12 @@ export function BinderPages({
                             <CardArt src={s.imageSmall} alt={s.name} owned />
                           </div>
                         ) : (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                            <span className="num text-[11px] font-bold text-ink-dim">
-                              #{s.number}
+                          // The caption under the pocket already prints the
+                          // number, so printing it in here too said the number
+                          // twice and never said which card is missing.
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-1.5 text-center">
+                            <span className="line-clamp-2 text-[10px] font-semibold leading-tight text-ink-dim">
+                              {s.name}
                             </span>
                             <span className="rounded bg-need/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-need">
                               Need

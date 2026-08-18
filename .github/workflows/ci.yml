@@ -125,7 +125,9 @@ jobs:
 
       # A DOM-node bound on the largest master set, proved by scrolling it.
       - name: Set-grid windowing stays bounded
-        run: node tests/e2e/virtualization.mjs http://localhost:3100
+        run: |
+          COOKIE="$(npx tsx scripts/ci/local-identity.ts ci-windowing@example.test)"
+          node tests/e2e/virtualization.mjs http://localhost:3100 "$COOKIE"
 
       # The signature moment, and the once-only semantics behind it, at both
       # motion preferences.
@@ -135,7 +137,9 @@ jobs:
       # Every screen with the image CDN unreachable — the normal condition for
       # Card Show mode, not an edge case.
       - name: No artwork
-        run: node tests/e2e/no-artwork.mjs http://localhost:3100
+        run: |
+          COOKIE="$(npx tsx scripts/ci/local-identity.ts ci-artwork@example.test)"
+          node tests/e2e/no-artwork.mjs http://localhost:3100 "$COOKIE"
 
       - name: Concurrency and idempotency over HTTP
         run: |

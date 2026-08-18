@@ -70,14 +70,16 @@ export function CompletionCard({
 
         <div className="mt-4 flex items-start gap-3.5">
           {data.logoUrl ? (
-            // Deliberately not next/image: this component has to render
-            // identically in a share surface with no image optimiser behind it.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={data.logoUrl}
-              alt=""
-              className="h-11 w-11 shrink-0 object-contain"
-              loading="lazy"
+            // A background image rather than an <img>, and deliberately not
+            // next/image. The set logo is decoration: if it does not load — a
+            // bad connection, or a share surface with no image optimiser behind
+            // it — nothing should paint. An <img> would leave a broken-image
+            // glyph on the one artefact a collector is most likely to keep.
+            <div
+              aria-hidden
+              role="presentation"
+              style={{ backgroundImage: `url(${data.logoUrl})` }}
+              className="h-11 w-11 shrink-0 bg-contain bg-center bg-no-repeat"
             />
           ) : null}
           <div className="min-w-0">

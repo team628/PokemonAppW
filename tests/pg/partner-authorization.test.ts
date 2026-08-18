@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { withIdentity, withServiceRole, closePool } from '@/lib/db/pg';
+import { withIdentity, withServiceRole, closePool, type Tx } from '@/lib/db/pg';
 import { addToCollection } from '@/lib/services/pg/collection';
 import { addGoal, demandPopulation, demandReport, rebuildWantIndex } from '@/lib/services/pg';
 import { seedSet, seedUser, dropUsers, type Fixture } from './fixtures';
@@ -61,11 +61,7 @@ afterAll(async () => {
 });
 
 /** A statement run as the anonymous web role, with no identity claims at all. */
-async function asAnon<T>(fn: (tx: {
-  rows: <R>(s: string, p?: readonly unknown[]) => Promise<R[]>;
-  one: <R>(s: string, p?: readonly unknown[]) => Promise<R | null>;
-  exec: (s: string, p?: readonly unknown[]) => Promise<unknown>;
-}) => Promise<T>): Promise<T> {
+async function asAnon<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
   return withIdentity(null, fn);
 }
 
