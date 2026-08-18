@@ -16,6 +16,7 @@
     "setup": "npm run snapshot:restore && npm run migrate && npm run ingest:catalog && npm run ingest:prices",
     "test:e2e": "node tests/e2e/flow.mjs",
     "migrate": "node scripts/pg/migrate.mjs",
+    "verify": "node scripts/pg/verify.mjs",
     "load:generate": "tsx tests/load/generate.ts",
     "snapshot:restore": "node scripts/pg/snapshot.mjs restore",
     "snapshot:capture": "node scripts/pg/snapshot.mjs capture",

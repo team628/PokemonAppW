@@ -91,6 +91,12 @@ jobs:
       - name: Ingest prices
         run: npm run ingest:prices
 
+      # The same gate that must pass before a deployment is exposed. Running it
+      # here means a migration that reopens one of the privilege holes fails the
+      # pull request rather than the deploy.
+      - name: Verify the database is safe to expose
+        run: npm run verify
+
       - name: Report ingested corpus
         run: |
           psql "$DATABASE_URL" -c "
@@ -133,6 +139,14 @@ jobs:
       # motion preferences.
       - name: Set completion moment
         run: node tests/e2e/completion.mjs http://localhost:3100
+
+      # The other half of the artwork question: the URLs the server renders,
+      # fetched from the real provider CDN. Reports BLOCKED rather than failing
+      # where the runner has no route to the image host.
+      - name: Real artwork
+        run: |
+          COOKIE="$(npx tsx scripts/ci/local-identity.ts ci-artwork-real@example.test)"
+          node tests/e2e/artwork.mjs http://localhost:3100 "$COOKIE"
 
       # Every screen with the image CDN unreachable — the normal condition for
       # Card Show mode, not an edge case.

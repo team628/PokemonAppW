@@ -1,6 +1,5 @@
 import { createServerClient, createBrowserClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import type { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Supabase Auth clients.
@@ -37,21 +36,6 @@ export async function serverClient() {
           // Called from a Server Component, where the jar is read-only. The
           // middleware refresh below is what keeps the session current.
         }
-      },
-    },
-  });
-}
-
-/**
- * Middleware client. Refreshing the session here is what lets Server Components
- * read a valid session without being able to write cookies themselves.
- */
-export function middlewareClient(req: NextRequest, res: NextResponse) {
-  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    cookies: {
-      getAll: () => req.cookies.getAll(),
-      setAll: (list) => {
-        for (const { name, value, options } of list) res.cookies.set(name, value, options);
       },
     },
   });
