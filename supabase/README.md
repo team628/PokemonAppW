@@ -23,7 +23,20 @@ supabase db push                       # runs supabase/migrations in order
 supabase db execute -f supabase/schedule.sql   # registers pg_cron jobs
 ```
 
-Migrations are idempotent and safe to re-run.
+Migrations are idempotent and safe to re-run — CI applies them twice to prove it.
+
+Then verify the database is safe to expose before pointing anything at it:
+
+```bash
+SUPABASE_DB_URL=... npm run verify
+```
+
+This exits non-zero on a database missing migration 0013, and on any database
+where a SECURITY DEFINER function is executable by PUBLIC, RLS is off on an
+owner-scoped table, or `anon` can reach more than its three intended entry
+points. It asks the database what is true of it rather than reading a version
+number, so it also catches a correctly-migrated database that has since had a
+grant restored underneath it.
 
 ## Secrets used by the scheduler
 
@@ -39,13 +52,32 @@ select vault.create_secret('<service role key>', 'setvalue_service_key');
 
 | Job | Cadence | Responsibility |
 |---|---|---|
-| `setvalue-hourly-prices` | hourly, :07 | refresh market prices, highest-intent cards first |
-| `setvalue-nightly-catalog` | daily, 03:20 UTC | discover sets/cards/printings, reconcile metadata |
+| `setvalue-hourly-prices` | hourly, :07 | `price-sync` — refresh 12 sets, most-wanted first, among those older than 20h |
+| `setvalue-nightly-catalog` | daily, 03:20 UTC | `catalog-sync` — discover sets/cards/printings, reconcile metadata, rebuild the want index |
 | `setvalue-want-index` | daily, 03:50 UTC | rebuild the want index from first principles |
 | `setvalue-sweeps` | daily, 04:30 UTC | expire idempotency keys and rate-limit windows |
 
-The want index is maintained incrementally by triggers during the day; the
-nightly rebuild is a reconciliation backstop, not the primary mechanism.
+The first two are Edge Functions (`supabase/functions/`); the last two run
+entirely in-database. All four are registered by `schedule.sql`.
+
+The provider serves prices a set at a time, so a set is the unit of work.
+Twelve an hour against a 174-set catalog is 288 set-refreshes a day — every set
+at least daily, with headroom for the most-wanted to come round more than once.
+Ordering by demand alone would refresh the same dozen popular sets forever, so a
+set only becomes a candidate once its prices are stale; among the candidates,
+open demand from the want index decides the order.
+
+The want index is maintained incrementally by triggers during the day. It is
+rebuilt twice a night on purpose: `catalog-sync` rebuilds it because cards
+discovered in that run can create new wants, and the standalone job repeats it
+in-database so reconciliation still happens on a night when the provider is
+unreachable and `catalog-sync` fails.
+
+A scheduled run that fails is recorded in `sync_runs` with status `failed` and
+the error. The ingest's own run row is written inside the transaction that does
+the work and rolls back with it — which is correct, but would mean an outage
+left no trace at all, and "no row" is also what a job that never fired looks
+like.
 
 ## Local development
 

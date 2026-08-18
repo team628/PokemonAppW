@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { inferVariants, isHoloOnlyRarity, primaryVariant } from '@/lib/catalog/variants';
 import { withIdentity, closePool } from '@/lib/db/pg';
-import { parseNumber } from '../scripts/pg/ingest';
+import { parseNumber } from '../src/lib/sync/ingest';
 
 afterAll(async () => {
   await closePool();

@@ -1,0 +1,19 @@
+{
+  "//": "Deno configuration for the Edge Functions. Supabase's runtime resolves npm: specifiers natively and bundles with esbuild, which resolves extensionless relative TypeScript imports; sloppy-imports is what lets `deno check` and `deno run` do the same locally, so these functions can be exercised against a real database before they are deployed.",
+  "imports": {
+    "postgres": "npm:postgres@3.4.5"
+  },
+  "nodeModulesDir": "auto",
+  "compilerOptions": {
+    "lib": [
+      "deno.window",
+      "dom",
+      "dom.iterable",
+      "ES2022"
+    ],
+    "strict": true
+  },
+  "unstable": [
+    "sloppy-imports"
+  ]
+}
