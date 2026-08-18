@@ -232,6 +232,36 @@ try {
     `setsize=${setsize} total=${total}`,
   );
 
+  // ------------------------------------------------------ every breakpoint
+  //
+  // The column count comes from the container's computed
+  // `grid-template-columns`, so a new breakpoint in the CSS changes the window
+  // without anyone editing the hook. That is the point — and the reason to
+  // check the bound still holds at each of them rather than only on a phone.
+  console.log('\nthe bound holds at every width');
+  for (const width of [390, 768, 1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${BASE}/app/sets/${SET}?mode=master`);
+    await page.waitForSelector('ul[aria-label$="cards"] > li');
+    await page.waitForTimeout(600);
+    const cols = await page.$eval(
+      'ul[aria-label$="cards"]',
+      (e) => getComputedStyle(e).gridTemplateColumns.split(' ').length,
+    );
+    const tall = await page.evaluate(() => document.documentElement.scrollHeight);
+    let peak = 0;
+    for (let y = 0; y <= tall; y += 900) {
+      await page.evaluate((to) => window.scrollTo(0, to), y);
+      await page.waitForTimeout(80);
+      peak = Math.max(peak, await tiles());
+    }
+    check(
+      `${width}px: ${cols} columns, ${peak} of ${total} tiles at peak`,
+      peak < total / 2 && peak >= cols,
+    );
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+
   // -------------------------------------------------------------- pull list
   console.log('\ncard show pull list');
   await page.goto(`${BASE}/app/show`);
