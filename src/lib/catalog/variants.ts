@@ -21,6 +21,12 @@ export const VARIANTS = [
   'unlimitedHolofoil',
   'unlimited',
   '1stEdition',
+  // Shadowless printings — historically real for Base Set only. Kept as
+  // non-primary identities: they carry their own independent price and count
+  // in master-mode goals, but never displace the primary printing a
+  // main/complete goal requires, so existing completion math is unchanged.
+  'shadowless',
+  'shadowlessHolofoil',
 ] as const;
 
 export type Variant = (typeof VARIANTS)[number];
@@ -36,6 +42,8 @@ export const VARIANT_LABEL: Record<Variant, string> = {
   unlimitedHolofoil: 'Unlimited Holo',
   unlimited: 'Unlimited',
   '1stEdition': '1st Edition',
+  shadowless: 'Shadowless',
+  shadowlessHolofoil: 'Shadowless Holo',
 };
 
 export const VARIANT_SHORT: Record<Variant, string> = {
@@ -47,6 +55,8 @@ export const VARIANT_SHORT: Record<Variant, string> = {
   unlimitedHolofoil: 'UNL-H',
   unlimited: 'UNL',
   '1stEdition': '1ED',
+  shadowless: 'SHDW',
+  shadowlessHolofoil: 'SHDW-H',
 };
 
 export function isVariant(v: string): v is Variant {
@@ -148,6 +158,10 @@ export function primaryVariant(available: Variant[]): Variant {
     'unlimitedHolofoil',
     '1stEdition',
     'reverseHolofoil',
+    // Shadowless never wins the primary slot — it is an added identity, not the
+    // printing a main/complete goal is scored against.
+    'shadowless',
+    'shadowlessHolofoil',
   ];
   for (const v of order) if (available.includes(v)) return v;
   return available[0] ?? 'normal';
