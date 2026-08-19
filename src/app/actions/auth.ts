@@ -27,6 +27,10 @@ export async function signUpAction(_prev: State, formData: FormData): Promise<St
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const password = String(formData.get('password') ?? '');
   const displayName = String(formData.get('displayName') ?? '').trim();
+  // Private-beta invite code. It travels as signup metadata so the database gate
+  // (a trigger on auth.users) validates and atomically consumes it — the check
+  // is the database's, never this form's.
+  const inviteCode = String(formData.get('inviteCode') ?? '').trim();
 
   const gate = await consumeRateLimit(`signup:${await addressKey()}`, RULES.signUp.limit, RULES.signUp.windowSeconds);
   if (!gate.allowed) {
@@ -38,7 +42,7 @@ export async function signUpAction(_prev: State, formData: FormData): Promise<St
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_name: displayName } },
+      options: { data: { display_name: displayName, invite_code: inviteCode } },
     });
     if (error) {
       // Account creation is gated in the database (invite-only beta): a
@@ -52,7 +56,7 @@ export async function signUpAction(_prev: State, formData: FormData): Promise<St
       if (status === 500 || /database error saving new user/i.test(error.message)) {
         return {
           error:
-            'SetValue is in invite-only beta. Please sign up with the exact email your invite was sent to.',
+            'That invite code isn’t valid, has expired, or has already been used. SetValue is in private beta — check the code and try again.',
         };
       }
       return { error: error.message };

@@ -31,6 +31,11 @@ export default function SignUpPage() {
           <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} className="field mt-1.5" />
           <p className="mt-1 text-[11px] text-ink-mute">At least 8 characters.</p>
         </div>
+        <div>
+          <label className="label" htmlFor="inviteCode">Invite code</label>
+          <input id="inviteCode" name="inviteCode" autoComplete="off" autoCapitalize="characters" required className="field mt-1.5" placeholder="Your beta invite code" />
+          <p className="mt-1 text-[11px] text-ink-mute">SetValue is in private beta — enter the code you were given.</p>
+        </div>
         {state?.error && (
           <p role="alert" className="rounded-lg border border-need/40 bg-need/10 px-3 py-2 text-sm text-need">
             {state.error}
