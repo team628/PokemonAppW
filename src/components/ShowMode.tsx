@@ -576,8 +576,10 @@ function Lookup({
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
+  const [reported, setReported] = useState<string | null>(null);
 
   useEffect(() => {
+    setReported(null);
     const term = q.trim();
     if (term.length < 1) {
       setHits([]);
@@ -598,6 +600,25 @@ function Lookup({
     }, 180);
     return () => clearTimeout(t);
   }, [q, setId]);
+
+  const reportGap = async () => {
+    const term = q.trim();
+    if (!term) return;
+    setReported(term);
+    try {
+      await fetch('/api/catalog-gap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ term, setId: setId ?? null, resultCount: hits.length }),
+      });
+    } catch {
+      // Best-effort: the collector's report is a nicety, not a blocking action.
+    }
+  };
+
+  const term = q.trim();
+  const showGapPrompt = term.length >= 2 && !loading;
+  const alreadyReported = reported === term;
 
   return (
     <div>
@@ -659,6 +680,26 @@ function Lookup({
           </li>
         ))}
       </ul>
+
+      {showGapPrompt &&
+        (alreadyReported ? (
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-mute">
+            Thanks — we logged “{reported}” so we can add or make it findable. You can
+            keep searching with a different spelling in the meantime.
+          </p>
+        ) : (
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-mute">
+            {hits.length === 0 ? "Can't find it? " : "Not the card you meant? "}
+            <button
+              type="button"
+              onClick={reportGap}
+              className="font-semibold text-have underline underline-offset-2"
+            >
+              Tell us what you searched
+            </button>{' '}
+            and we'll review the gap.
+          </p>
+        ))}
     </div>
   );
 }

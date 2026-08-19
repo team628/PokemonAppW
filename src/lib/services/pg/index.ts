@@ -585,6 +585,43 @@ export async function searchCards(userId: string | null, q: string, setId?: stri
   });
 }
 
+/**
+ * Group many spellings of the same miss together for owner review. Deliberately
+ * modest: lower-case, collapse whitespace, drop surrounding punctuation. It is
+ * NOT accent-folded (there is no unaccent extension yet), and it is honest about
+ * that — "Flabébé" and "Flabebe" stay distinct until real folding lands.
+ */
+export function normalizeSearchTerm(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/[^\p{L}\p{N} ]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * "Can't find my card" — record the exact term a collector could not resolve,
+ * the set they had selected, and how many results the search returned. Written
+ * under the collector's own identity so RLS scopes the row to them; the owner
+ * reviews the aggregate via public.list_catalog_gaps() (service_role only).
+ */
+export async function reportCatalogGap(
+  userId: string,
+  input: { term: string; setId?: string | null; resultCount?: number },
+): Promise<void> {
+  const term = input.term.trim().slice(0, 120);
+  const normalized = normalizeSearchTerm(term).slice(0, 120);
+  if (!term || !normalized) return;
+  await withIdentity(userId, (tx) =>
+    tx.exec(
+      `insert into public.catalog_gap_reports (user_id, term, normalized, set_id, result_count)
+       values (auth.uid(), $1, $2, $3, $4)`,
+      [term, normalized, input.setId ?? null, Math.max(0, Math.trunc(input.resultCount ?? 0))],
+    ),
+  );
+}
+
 // --------------------------------------------------------------- partners ---
 
 export async function demandReport(limit = 60, setId?: string) {
