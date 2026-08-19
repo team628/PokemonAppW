@@ -40,7 +40,23 @@ export async function signUpAction(_prev: State, formData: FormData): Promise<St
       password,
       options: { data: { display_name: displayName } },
     });
-    if (error) return { error: error.message };
+    if (error) {
+      // Account creation is gated in the database (invite-only beta): a
+      // BEFORE INSERT trigger on auth.users rejects an un-invited email, which
+      // GoTrue surfaces as a generic "Database error saving new user" (HTTP
+      // 500). Translate that one case into a clear reason, without confirming
+      // whether any particular address is on the list. Genuine input errors
+      // (e.g. a weak password, 422) still return their own message. The gate
+      // itself is the database's, not this line's — this only affects wording.
+      const status = (error as { status?: number }).status;
+      if (status === 500 || /database error saving new user/i.test(error.message)) {
+        return {
+          error:
+            'SetValue is in invite-only beta. Please sign up with the exact email your invite was sent to.',
+        };
+      }
+      return { error: error.message };
+    }
     return { notice: 'Check your email to confirm your account, then sign in.' };
   }
 

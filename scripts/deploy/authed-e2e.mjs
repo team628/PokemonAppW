@@ -44,7 +44,19 @@ function http(method, url, { headers = {}, body, cookie } = {}) {
   for (const [k, v] of Object.entries(headers)) args.push('-H', `${k}: ${v}`);
   if (cookie) args.push('-H', `Cookie: ${cookie}`);
   if (body !== undefined) { args.push('-H', 'Content-Type: application/json', '--data-binary', '@-'); }
-  const out = execFileSync('curl', args, { input: body !== undefined ? JSON.stringify(body) : undefined, maxBuffer: 64 * 1024 * 1024 }).toString();
+  // curl exits non-zero on a transient network blip; execFileSync would throw
+  // and abort the whole suite. Retry once, then surface a status:0 result so a
+  // single flaky request fails just its own assertion.
+  let out = '';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      out = execFileSync('curl', args, { input: body !== undefined ? JSON.stringify(body) : undefined, maxBuffer: 64 * 1024 * 1024 }).toString();
+      break;
+    } catch (e) {
+      out = (e.stdout ? e.stdout.toString() : '') || `${SENT}0`;
+      if (attempt === 0) continue;
+    }
+  }
   const idx = out.lastIndexOf(SENT);
   const rawBody = idx >= 0 ? out.slice(0, idx) : out;
   const status = idx >= 0 ? Number(out.slice(idx + SENT.length)) : 0;
@@ -59,6 +71,20 @@ async function adminCreateUser(email, password, displayName) {
   });
   return r.json?.id;
 }
+
+/** Try to create a user and report whether the invite gate allowed it. */
+function tryCreateUser(email, password) {
+  const r = http('POST', `${AUTH}/admin/users`, {
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
+    body: { email, password, email_confirm: true },
+  });
+  return { ok: r.status < 300 && Boolean(r.json?.id), status: r.status, id: r.json?.id, body: r.body };
+}
+
+const grantInvite = (email) =>
+  http('POST', `${SUPABASE_URL}/rest/v1/rpc/grant_beta_invite`, {
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` }, body: { p_email: email, p_note: 'e2e' },
+  });
 function adminDeleteUser(id) {
   if (id) http('DELETE', `${AUTH}/admin/users/${id}`, { headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } });
 }
@@ -101,9 +127,18 @@ async function main() {
   const PW = `Setvalue-E2E-${stamp}-x`;
   let aliceId, bobId;
   try {
+    // Invite gate — the un-invited email is rejected at the database (admin
+    // path shown here; the public anon /signup path is gated by the same
+    // trigger). Then, after granting invites, the identical creation succeeds.
+    const uninvited = `e2e.uninvited.${stamp}@setvalue-e2e.test`;
+    const blocked = tryCreateUser(uninvited, PW);
+    check('invite gate: un-invited signup is rejected', !blocked.ok, `status ${blocked.status}`);
+
+    grantInvite(aliceEmail);
+    grantInvite(bobEmail);
     aliceId = await adminCreateUser(aliceEmail, PW, 'E2E Alice');
     bobId = await adminCreateUser(bobEmail, PW, 'E2E Bob');
-    check('auth: created two confirmed users', Boolean(aliceId && bobId));
+    check('invite gate: invited signup is allowed (two users created)', Boolean(aliceId && bobId));
 
     const alice = signIn(aliceEmail, PW);
     const bob = signIn(bobEmail, PW);
@@ -206,7 +241,8 @@ async function main() {
   } finally {
     adminDeleteUser(aliceId);
     adminDeleteUser(bobId);
-    console.log('\n  (cleanup) test users deleted');
+    try { await query("delete from public.beta_invites where email like '%@setvalue-e2e.test'"); } catch { /* best effort */ }
+    console.log('\n  (cleanup) test users + test invites removed');
   }
 
   console.log(`\n=== E2E RESULT: ${pass} passed, ${fail} failed ===`);
