@@ -1,4 +1,5 @@
 import { Pool, types, type PoolClient } from 'pg';
+import { SUPABASE_ROOT_CA } from './supabase-ca';
 
 /**
  * PostgreSQL access, with Row Level Security as the authorization boundary.
@@ -44,9 +45,15 @@ export function getPool(): Pool {
       max: Number(process.env.PG_POOL_MAX ?? 8),
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 10_000,
+      // Local Postgres speaks plaintext; a hosted pooler is verified against
+      // Supabase's own root CA. The pooler's certificate chains to "Supabase
+      // Root 2021 CA", which is not in Node's bundled trust store, so pinning
+      // it is what lets `rejectUnauthorized: true` build a trusted chain. This
+      // verifies MORE strictly than the public CA pool: only a certificate
+      // Supabase itself signed will be accepted.
       ssl: connectionString.includes('127.0.0.1') || connectionString.includes('localhost')
         ? undefined
-        : { rejectUnauthorized: true },
+        : { ca: SUPABASE_ROOT_CA, rejectUnauthorized: true },
     });
     globalThis.__setvalue_pool.on('error', (err) => {
       console.error('[pg] idle client error:', err.message);
