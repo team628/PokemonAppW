@@ -36,19 +36,20 @@ function check(name, ok, detail = '') {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
 }
 
-/** curl wrapper returning { status, headers, body, json }. */
+/** curl wrapper returning { status, body, json }. Status via -w sentinel so the
+ *  parse is robust to HTTP/2 + Cloudflare header framing (no -i splitting). */
+const SENT = '\n__STATUS__:';
 function http(method, url, { headers = {}, body, cookie } = {}) {
-  const args = ['-s', '-i', '--max-time', '45', '-X', method, url];
+  const args = ['-s', '--max-time', '45', '-X', method, url, '-w', `${SENT}%{http_code}`];
   for (const [k, v] of Object.entries(headers)) args.push('-H', `${k}: ${v}`);
   if (cookie) args.push('-H', `Cookie: ${cookie}`);
   if (body !== undefined) { args.push('-H', 'Content-Type: application/json', '--data-binary', '@-'); }
   const out = execFileSync('curl', args, { input: body !== undefined ? JSON.stringify(body) : undefined, maxBuffer: 64 * 1024 * 1024 }).toString();
-  const sep = out.indexOf('\r\n\r\n') >= 0 ? out.indexOf('\r\n\r\n') : out.indexOf('\n\n');
-  const head = out.slice(0, sep);
-  const rawBody = out.slice(sep).trim();
-  const status = Number(head.split(/\r?\n/)[0].split(' ')[1]);
+  const idx = out.lastIndexOf(SENT);
+  const rawBody = idx >= 0 ? out.slice(0, idx) : out;
+  const status = idx >= 0 ? Number(out.slice(idx + SENT.length)) : 0;
   let json = null; try { json = JSON.parse(rawBody); } catch { /* not json */ }
-  return { status, head, body: rawBody, json };
+  return { status, body: rawBody, json };
 }
 
 async function adminCreateUser(email, password, displayName) {
@@ -150,9 +151,12 @@ async function main() {
     const bogus = j(alice, 'PATCH', `/api/collection/item/00000000-0000-0000-0000-000000000000`, { quantity: 2 });
     check('edit: unknown item id is rejected (not a false success)', bogus.status >= 400, `status ${bogus.status}`);
 
-    // Remove one → drops below 100%; re-add → back to 100% (rollback semantics).
-    const rem = j(alice, 'POST', '/api/collection/remove', { cardId: cards[0].card_id, variant: cards[0].variant, withMode: 'main' });
-    check('remove: dropping a card recomputes below 100%', rem.status === 200 && rem.json.metrics.percent < 1, `percent=${rem.json?.metrics?.percent}`);
+    // Remove ALL copies of a card → drops below 100%; re-add → back to 100%
+    // (rollback semantics). Quantity 999 clears every copy — card 0 was bumped
+    // to qty 3 by the edit above, and removing a single copy would (correctly)
+    // leave it owned, so we clear the lot to exercise the completion drop.
+    const rem = j(alice, 'POST', '/api/collection/remove', { cardId: cards[0].card_id, variant: cards[0].variant, quantity: 999, withMode: 'main' });
+    check('remove: clearing a card recomputes below 100%', rem.status === 200 && rem.json.metrics.percent < 1, `percent=${rem.json?.metrics?.percent}`);
     const readd = j(alice, 'POST', '/api/collection/add', { cardId: cards[0].card_id, variant: cards[0].variant, withMode: 'main' });
     check('remove→re-add restores 100%', readd.status === 200 && Math.abs(readd.json.metrics.percent - 1) < 1e-9);
 
