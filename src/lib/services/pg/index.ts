@@ -558,31 +558,25 @@ export async function listSets(userId: string | null) {
   );
 }
 
-export async function searchCards(userId: string | null, q: string, setId?: string, limit = 30) {
+/**
+ * Collector-facing card search. Delegates ranking and normalization to
+ * public.card_search (migration 0019): substring + trigram-fuzzy over an
+ * accent/punctuation-folded document that also carries collector aliases
+ * (★→gold star, δ→delta, LV.X→level x, "M …-EX"→mega, promo/collector numbers,
+ * set name + code). Exact/prefix outrank substring, which outranks fuzzy, so the
+ * obvious card stays first. A set filter is optional; numbers resolve across all
+ * sets without one.
+ */
+export async function searchCards(userId: string | null, q: string, setId?: string, limit = 48) {
   const term = q.trim();
   if (!term) return [];
-  return withIdentity(userId, (tx) => {
-    const numeric = /^\d+$/.test(term);
-    if (setId && numeric) {
-      return tx.rows(
-        `select c.id, c.name, c.number, c.set_id, s.name as set_name, c.rarity, c.image_small,
-                public.slot_market_cents(p.market_cents,p.mid_cents,p.low_cents) as market_cents
-         from public.cards c join public.sets s on s.id = c.set_id
-         left join public.prices p on p.card_id=c.id and p.provider='tcgplayer'
-         where c.set_id = $1 and c.number = $2 limit $3`,
-        [setId, term, limit],
-      );
-    }
-    return tx.rows(
-      `select c.id, c.name, c.number, c.set_id, s.name as set_name, c.rarity, c.image_small,
-              public.slot_market_cents(p.market_cents,p.mid_cents,p.low_cents) as market_cents
-       from public.cards c join public.sets s on s.id = c.set_id
-       left join public.prices p on p.card_id=c.id and p.provider='tcgplayer'
-       where ${setId ? 'c.set_id = $3 and ' : ''}lower(c.name) like lower($1)
-       order by s.release_date desc nulls last, c.number_sort limit $2`,
-      setId ? [`${term}%`, limit, setId] : [`${term}%`, limit],
-    );
-  });
+  return withIdentity(userId, (tx) =>
+    tx.rows(
+      `select id, name, number, set_id, set_name, rarity, image_small, market_cents
+         from public.card_search($1, $2, $3)`,
+      [term, setId ?? null, limit],
+    ),
+  );
 }
 
 /**
