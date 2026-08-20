@@ -76,8 +76,9 @@ for (const c of cards) {
 async function main() {
   console.log(`Tranche 2A → ${prod ? 'PRODUCTION' : 'local'}: ${cardRows.length} cards, ${variantRows.length} variants, ${priceRows.length} prices`);
 
-  // 1. MEP set (metadata only; SVP set already exists and is untouched).
-  await run(`insert into public.sets (id,name,series,printed_total,total,ptcgo_code,release_date,provider)
+  // 1. Set metadata (only when creating a new set; existing sets are untouched —
+  //    pass mepSet=null to add cards into a set that already exists, e.g. swshp).
+  if (mepSet) await run(`insert into public.sets (id,name,series,printed_total,total,ptcgo_code,release_date,provider)
     values (${lit(mepSet.id)},${lit(mepSet.name)},${lit(mepSet.series)},${lit(mepSet.printedTotal)},${lit(mepSet.total)},${lit(mepSet.ptcgoCode)},${lit(mepSet.releaseDate)},'tcgcsv')
     on conflict (id) do update set name=excluded.name, series=excluded.series,
       printed_total=excluded.printed_total, total=excluded.total,
