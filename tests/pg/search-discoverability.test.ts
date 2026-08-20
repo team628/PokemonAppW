@@ -121,5 +121,14 @@ describe('collector search — required regression queries', () => {
       tx.rows<{ prov: string }>("select provider as prov from public.cards where id = 'mep-1'"),
     );
     expect(prov).toBe('tcgcsv');
+
+    // 2A name-precision supplement: Mega Charizard X/Y ex (TCGplayer's precise names)
+    const [{ hasSupp }] = await withIdentity(null, (tx) =>
+      tx.rows<{ hasSupp: boolean }>("select exists(select 1 from public.cards where id = 'mep-30') as \"hasSupp\""),
+    );
+    if (hasSupp) {
+      expect((await search('MEP 023')).some((r) => r.id === 'mep-23')).toBe(true);
+      expect(hasName(await search('Mega Charizard Y ex'), 'Mega Charizard Y ex')).toBe(true);
+    }
   });
 });
