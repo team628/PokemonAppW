@@ -104,4 +104,22 @@ describe('collector search — required regression queries', () => {
     expect((await search('SVP 207')).some((r) => r.id === 'svp-207')).toBe(true);
     expect((await search('svp166')).some((r) => r.id === 'svp-166')).toBe(true);
   });
+
+  // Tranche 2A: TCGplayer-derived (TCGCSV) promos pokemontcg.io lacks — MEP set +
+  // SVP tail. Presence-guarded, since these are ingested via a deploy script, not
+  // the fetched pokemontcg mirror.
+  it('makes the Tranche-2A MEP / SVP-tail promos discoverable by name and promo number when present', async () => {
+    const [{ present }] = await withIdentity(null, (tx) =>
+      tx.rows<{ present: boolean }>("select exists(select 1 from public.cards where id = 'mep-1') as present"),
+    );
+    if (!present) return;
+    expect((await search('MEP 009')).some((r) => r.id === 'mep-9')).toBe(true);
+    expect((await search('mep001')).some((r) => r.id === 'mep-1')).toBe(true);
+    expect((await search('SVP 210')).some((r) => r.id === 'svp-210')).toBe(true);
+    // provenance: these are TCGplayer-derived, never labelled pokemontcg
+    const [{ prov }] = await withIdentity(null, (tx) =>
+      tx.rows<{ prov: string }>("select provider as prov from public.cards where id = 'mep-1'"),
+    );
+    expect(prov).toBe('tcgcsv');
+  });
 });
