@@ -90,4 +90,18 @@ describe('collector search — required regression queries', () => {
   it('returns nothing for an empty query', async () => {
     expect(await search('   ')).toEqual([]);
   });
+
+  // Tranche 1: SVP promos re-synced from live pokemontcg.io (svp 165 -> 200).
+  // The catalog mirror is fetched (data/raw is gitignored) and upstream may lag,
+  // so this asserts discoverability *when* the promos are present — the Tranche-1
+  // guarantee — and is inert against a stale snapshot rather than failing it.
+  it('makes the re-synced SVP promos discoverable by name and promo number when present', async () => {
+    const [{ present }] = await withIdentity(null, (tx) =>
+      tx.rows<{ present: boolean }>("select exists(select 1 from public.cards where id = 'svp-207') as present"),
+    );
+    if (!present) return; // upstream snapshot predates the SVP re-sync; nothing to assert
+    expect(hasName(await search('Bloodmoon Ursaluna ex'), 'Bloodmoon Ursaluna ex')).toBe(true);
+    expect((await search('SVP 207')).some((r) => r.id === 'svp-207')).toBe(true);
+    expect((await search('svp166')).some((r) => r.id === 'svp-166')).toBe(true);
+  });
 });
