@@ -126,6 +126,19 @@ jobs:
           done
           echo "server did not come up"; cat /tmp/server.log; exit 1
 
+      # The signup form requires a private-beta invite code. Seed a genuine one
+      # into the isolated CI database through the real owner function — no
+      # application change, no bypass, no production code — and hand it to the
+      # e2e so it signs up exactly as an invited collector would. The gate flag
+      # stays OFF here (CI's local-auth default, so the sibling identity steps
+      # below still mint freely); the gate's validation + atomic consumption is
+      # proven against the real trigger in tests/pg/invite-gate.test.ts.
+      - name: Seed a private-beta invite code for the E2E signup
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "select public.create_invite_code('CI-E2E-SIGNUP', 100, null, 'ci-e2e-signup');"
+          echo "E2E_INVITE_CODE=CI-E2E-SIGNUP" >> "$GITHUB_ENV"
+
       - name: Browser end-to-end
         run: node tests/e2e/flow.mjs http://localhost:3100
 

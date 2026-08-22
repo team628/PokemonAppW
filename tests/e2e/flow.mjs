@@ -62,6 +62,12 @@ try {
   await page.fill('#displayName', 'E2E Collector');
   await page.fill('#email', email);
   await page.fill('#password', 'password-1234');
+  // The signup form requires a private-beta invite code. The CI harness seeds a
+  // genuine one (public.create_invite_code) into the isolated database and passes
+  // it here, so this fills the field exactly as a legitimate invited user would.
+  // (In CI's local-auth mode the gate flag is off; consumption through the real
+  // enforce_beta_invite trigger is proven in tests/pg/invite-gate.test.ts.)
+  await page.fill('#inviteCode', process.env.E2E_INVITE_CODE ?? 'E2E_LOCAL_TEST_CODE');
   await page.click('button:has-text("Create account")');
   await page.waitForURL('**/onboarding', { timeout: 20000 });
   check('lands on onboarding after signup', page.url().includes('/onboarding'));
