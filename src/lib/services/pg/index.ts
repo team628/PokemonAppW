@@ -567,14 +567,20 @@ export async function listSets(userId: string | null) {
  * obvious card stays first. A set filter is optional; numbers resolve across all
  * sets without one.
  */
-export async function searchCards(userId: string | null, q: string, setId?: string, limit = 48) {
+export async function searchCards(
+  userId: string | null,
+  q: string,
+  setId?: string,
+  limit = 48,
+  offset = 0,
+) {
   const term = q.trim();
   if (!term) return [];
   return withIdentity(userId, (tx) =>
     tx.rows(
-      `select id, name, number, set_id, set_name, rarity, image_small, market_cents
-         from public.card_search($1, $2, $3)`,
-      [term, setId ?? null, limit],
+      `select id, name, number, set_id, set_name, rarity, image_small, market_cents, total_count
+         from public.card_search($1, $2, $3, $4)`,
+      [term, setId ?? null, limit, Math.max(0, offset)],
     ),
   );
 }

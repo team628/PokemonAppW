@@ -573,33 +573,67 @@ function Lookup({
   setId: string | null;
   onFound: (slot: PullSlot, paidCents: number | null) => void;
 }) {
+  const PAGE = 30;
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [reported, setReported] = useState<string | null>(null);
+
+  // One loader for both the first page and each "show more" page. Appending by
+  // offset walks the full ranked result set, so no printing is ever dropped —
+  // heavily reprinted names (Pikachu has 287 printings) stay fully reachable.
+  const loadPage = async (term: string, offset: number, append: boolean) => {
+    const url =
+      `/api/search?q=${encodeURIComponent(term)}` +
+      `${setId ? `&set=${setId}` : ''}&limit=${PAGE}&offset=${offset}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const rows: SearchHit[] = data.results ?? [];
+    setTotal(Number(data.total ?? rows.length));
+    setHasMore(Boolean(data.hasMore));
+    setHits((prev) => (append ? [...prev, ...rows] : rows));
+  };
 
   useEffect(() => {
     setReported(null);
     const term = q.trim();
     if (term.length < 1) {
       setHits([]);
+      setTotal(0);
+      setHasMore(false);
       return;
     }
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const url = `/api/search?q=${encodeURIComponent(term)}${setId ? `&set=${setId}` : ''}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        setHits(data.results ?? []);
+        await loadPage(term, 0, false);
       } catch {
         setHits([]);
+        setTotal(0);
+        setHasMore(false);
       } finally {
         setLoading(false);
       }
     }, 180);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, setId]);
+
+  const loadMore = async () => {
+    const term = q.trim();
+    if (!term || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await loadPage(term, hits.length, true);
+    } catch {
+      // leave the current page in place; the button stays available to retry
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const reportGap = async () => {
     const term = q.trim();
@@ -680,6 +714,19 @@ function Lookup({
           </li>
         ))}
       </ul>
+
+      {hasMore && (
+        <button
+          type="button"
+          onClick={loadMore}
+          disabled={loadingMore}
+          className="btn-ghost mt-3 w-full text-xs"
+        >
+          {loadingMore
+            ? 'Loading more printings…'
+            : `Show more printings (${hits.length} of ${total})`}
+        </button>
+      )}
 
       {showGapPrompt &&
         (alreadyReported ? (
