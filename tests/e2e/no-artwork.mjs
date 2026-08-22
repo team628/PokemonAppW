@@ -88,6 +88,7 @@ async function ensureCollector(label, cards = 0) {
     await page.fill('#displayName', label);
     await page.fill('#email', `${label.toLowerCase()}-${Date.now()}@example.com`);
     await page.fill('#password', 'password-1234');
+    await page.fill('#inviteCode', process.env.E2E_INVITE_CODE ?? 'E2E_LOCAL_TEST_CODE');
     await page.click('button:has-text("Create account")');
     await page.waitForURL('**/onboarding', { timeout: 20000 });
   } else {

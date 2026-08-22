@@ -60,6 +60,7 @@ async function run(reducedMotion) {
     await page.fill('#displayName', 'Completionist');
     await page.fill('#email', `complete-${Date.now()}-${reducedMotion ? 'r' : 'd'}@example.com`);
     await page.fill('#password', 'password-1234');
+    await page.fill('#inviteCode', process.env.E2E_INVITE_CODE ?? 'E2E_LOCAL_TEST_CODE');
     await page.click('button:has-text("Create account")');
     await page.waitForURL('**/onboarding', { timeout: 20000 }).catch(async (e) => {
       // This suite needs a collector who has never finished this set, so it
