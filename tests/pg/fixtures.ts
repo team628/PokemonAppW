@@ -73,10 +73,19 @@ export async function seedSet(): Promise<Fixture> {
       );
     }
     for (const [cardId, variant, primary] of variants) {
+      // finish/edition are part of the card_variants identity (migration 0021's
+      // uq_card_variants_identity); derive them from the token as migration 0017
+      // does, so two finishes of one card don't collapse to the same identity.
+      const lc = variant.toLowerCase();
+      const finish = lc.includes('reverseholofoil')
+        ? 'Reverse Holofoil'
+        : lc.includes('holofoil')
+          ? 'Holofoil'
+          : 'Normal';
       await tx.exec(
-        `insert into public.card_variants (card_id, variant, source, is_primary)
-         values ($1, $2, 'market_data', $3)`,
-        [cardId, variant, primary],
+        `insert into public.card_variants (card_id, variant, source, is_primary, finish)
+         values ($1, $2, 'market_data', $3, $4)`,
+        [cardId, variant, primary, finish],
       );
     }
     for (const [cardId, variant, cents] of prices) {
