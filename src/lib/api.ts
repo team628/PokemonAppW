@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { AuthError, currentUser, type CurrentUser } from './auth/session';
-import { VARIANTS } from './catalog/variants';
+import { isVariantTokenShape } from './catalog/variants';
 import { CONDITIONS } from './domain/conditions';
 import { consumeRateLimit } from './services/pg';
 
@@ -60,7 +60,11 @@ export async function limitOrThrow(
   }
 }
 
-export const variantSchema = z.enum(VARIANTS);
+// Any structurally-valid printing token (base finish, or finish__treatment from
+// migration 0021). Existence for the specific card is authoritative in the
+// database (the add path verifies the card_variants row), so this stays a shape
+// check rather than a second allow-list that could fall behind the catalog.
+export const variantSchema = z.string().refine(isVariantTokenShape, 'unknown printing');
 export const conditionSchema = z.enum(CONDITIONS);
 export const goalModeSchema = z.enum(['main', 'complete', 'master']);
 

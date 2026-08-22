@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { CardArt } from './CardArt';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
+import { variantShort } from '@/lib/catalog/variants';
 
 export interface TileCard {
   cardId: string;
@@ -36,7 +36,7 @@ export function CardTile({
 }) {
   const owned = card.owned ?? true;
   const variantTag =
-    card.variant && card.variant !== 'normal' ? VARIANT_SHORT[card.variant as Variant] : null;
+    card.variant && card.variant !== 'normal' ? variantShort(card.variant) : null;
 
   const body = (
     <>

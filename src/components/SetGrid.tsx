@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useOptimistic, useRef, useState, useTransition } from 'react';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
+import { variantShort, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
 import { CardArt } from './CardArt';
 import { NeedFigure } from './NeedFigure';
@@ -253,7 +253,7 @@ export function SetGrid({
                 disabled={pending}
                 aria-pressed={s.owned}
                 aria-label={`${s.owned ? 'Remove' : 'Add'} ${s.name} number ${s.number}${
-                  s.variant !== 'normal' ? ` ${VARIANT_SHORT[s.variant]}` : ''
+                  s.variant !== 'normal' ? ` ${variantShort(s.variant)}` : ''
                 }`}
                 className={`group relative block w-full rounded-lg transition active:scale-95 ${
                   s.owned ? '' : 'opacity-95'
@@ -263,7 +263,7 @@ export function SetGrid({
                   src={s.imageSmall}
                   alt={s.name}
                   owned={s.owned}
-                  badge={mode === 'master' && s.variant !== 'normal' ? VARIANT_SHORT[s.variant] : null}
+                  badge={mode === 'master' && s.variant !== 'normal' ? variantShort(s.variant) : null}
                 />
                 {s.owned && (
                   <span

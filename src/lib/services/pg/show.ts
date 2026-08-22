@@ -97,7 +97,7 @@ export async function recordFind(
   input: {
     sessionId: string;
     cardId: string;
-    variant: Variant;
+    variant: string;
     paidCents?: number | null;
     condition?: Condition;
   },

@@ -1,6 +1,5 @@
 import { withIdentity, type Tx } from '../../db/pg';
 import { CONDITION_MULTIPLIER, type Condition } from '../../domain/conditions';
-import type { Variant } from '../../catalog/variants';
 
 /**
  * Collection reads and writes, in PostgreSQL.
@@ -291,8 +290,10 @@ export async function portfolioSummary(userId: string): Promise<PortfolioSummary
 }
 
 export interface AddInput {
+  // A stored printing token: a base finish, or `finish__treatment` (migration
+  // 0021). The database is authoritative for which tokens a given card has.
   cardId: string;
-  variant: Variant;
+  variant: string;
   quantity?: number;
   condition?: Condition;
   paidCents?: number | null;
@@ -303,7 +304,17 @@ export interface AddInput {
 }
 
 export async function addToCollection(userId: string, input: AddInput) {
-  return withIdentity(userId, (tx) => addWithin(tx, input));
+  return withIdentity(userId, async (tx) => {
+    // Authoritative check: only a printing the catalog actually lists for this
+    // card can be owned. This is what keeps the ownership layer from ever
+    // falling behind the identity model — no second hardcoded allow-list.
+    const exists = await tx.one<{ ok: boolean }>(
+      `select exists(select 1 from public.card_variants where card_id = $1 and variant = $2) as ok`,
+      [input.cardId, input.variant],
+    );
+    if (!exists?.ok) throw new Error('unknown printing for this card');
+    return addWithin(tx, input);
+  });
 }
 
 /** Add inside an existing transaction — used by the bulk import path. */
@@ -320,7 +331,7 @@ export async function addWithin(tx: Tx, input: AddInput) {
 
 export async function removeFromCollection(
   userId: string,
-  input: { cardId: string; variant: Variant; quantity?: number; condition?: Condition },
+  input: { cardId: string; variant: string; quantity?: number; condition?: Condition },
 ) {
   return withIdentity(userId, async (tx) =>
     (await tx.one<{ remaining: number; set_id: string }>(

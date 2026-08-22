@@ -5,7 +5,7 @@ import { withIdentity } from '@/lib/db/pg';
 import { TopBar } from '@/components/AppShell';
 import { Disclosure, Sparkline } from '@/components/ui';
 import { money, euros, daysSince, STALE_AFTER_DAYS } from '@/lib/pricing/quote';
-import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
+import { variantLabel } from '@/lib/catalog/variants';
 import { CardActions } from '@/components/CardActions';
 import { CardArt } from '@/components/CardArt';
 
@@ -38,7 +38,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
     if (!card) return null;
 
     const [variants, prices, owned, history, goalsNeeding] = await Promise.all([
-      tx.rows<{ variant: Variant; source: string; is_primary: boolean }>(
+      tx.rows<{ variant: string; source: string; is_primary: boolean }>(
         `select variant, source::text, is_primary from public.card_variants
          where card_id = $1 order by is_primary desc, variant`,
         [id],
@@ -190,7 +190,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[13px] font-bold">
-                        {VARIANT_LABEL[v.variant]}
+                        {variantLabel(v.variant)}
                         {qty > 0 && (
                           <span className="num ml-2 rounded-full bg-have/15 px-2 py-0.5 text-[10px] font-black text-have">
                             ×{qty}

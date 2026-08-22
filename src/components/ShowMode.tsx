@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_LABEL, VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
+import { variantShort, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
 import { CardArt } from './CardArt';
 import { NeedFigure } from './NeedFigure';
@@ -430,7 +430,7 @@ export function ShowMode({
                   <p className="num text-[11px] font-bold text-ink-mute">
                     #{s.number}
                     {s.variant !== 'normal' && (
-                      <span className="ml-1 text-gold">{VARIANT_SHORT[s.variant]}</span>
+                      <span className="ml-1 text-gold">{variantShort(s.variant)}</span>
                     )}
                   </p>
                   <p className="truncate text-[14px] font-bold leading-tight">{s.name}</p>

@@ -4,7 +4,7 @@ import { matchRows, parseRows } from '@/lib/services/import';
 import { withIdentity } from '@/lib/db/pg';
 import { addWithin } from '@/lib/services/pg/collection';
 import { syncMilestonesForSet, RULES } from '@/lib/services/pg';
-import { isVariant } from '@/lib/catalog/variants';
+import { isVariantTokenShape } from '@/lib/catalog/variants';
 import { CONDITIONS } from '@/lib/domain/conditions';
 
 const preview = z.object({ mode: z.literal('preview'), csv: z.string().max(4_000_000) });
@@ -15,7 +15,7 @@ const commit = z.object({
     .array(
       z.object({
         cardId: z.string().min(1),
-        variant: z.string().refine(isVariant, 'unknown printing'),
+        variant: z.string().refine(isVariantTokenShape, 'unknown printing'),
         quantity: z.number().int().min(1).max(999),
         condition: z.enum(CONDITIONS).optional(),
         paidCents: z.number().int().min(0).nullable().optional(),

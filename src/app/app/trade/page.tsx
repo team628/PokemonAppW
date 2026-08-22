@@ -6,7 +6,7 @@ import { TopBar } from '@/components/AppShell';
 import { CardArt } from '@/components/CardArt';
 import { Disclosure, Empty, Money, SectionTitle } from '@/components/ui';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
+import { variantLabel } from '@/lib/catalog/variants';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,7 +97,7 @@ export default async function TradePage() {
                             <p className="label">You get</p>
                             <p className="truncate text-[12px] font-bold leading-tight">{t.name}</p>
                             <p className="num truncate text-[10px] text-ink-mute">
-                              #{t.number} · {VARIANT_LABEL[t.variant as Variant]}
+                              #{t.number} · {variantLabel(t.variant)}
                             </p>
                             <Money cents={t.valueCents} className="text-[12px] font-bold text-need" />
                           </div>

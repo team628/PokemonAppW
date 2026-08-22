@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
+import { variantLabel, type Variant } from '@/lib/catalog/variants';
 import { CONDITION_LABEL, type Condition } from '@/lib/domain/conditions';
 import { CardArt } from './CardArt';
 
@@ -273,7 +273,7 @@ function Row({ h }: { h: HoldingView }) {
           #{h.number} · {h.setName}
         </p>
         <p className="truncate text-[11px] text-ink-mute">
-          {VARIANT_LABEL[h.variant]}
+          {variantLabel(h.variant)}
           {h.isGraded ? ` · ${h.gradeLabel}` : ` · ${CONDITION_LABEL[h.condition]}`}
           {h.quantity > 1 && ` · ×${h.quantity}`}
         </p>

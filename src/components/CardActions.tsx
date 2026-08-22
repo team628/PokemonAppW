@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { CONDITIONS, CONDITION_LABEL, type Condition } from '@/lib/domain/conditions';
-import type { Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
 
 export function CardActions({
@@ -13,7 +12,7 @@ export function CardActions({
   mode,
 }: {
   cardId: string;
-  variant: Variant;
+  variant: string;
   owned: number;
   setId: string;
   mode: GoalMode;

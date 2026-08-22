@@ -4,7 +4,7 @@ import { goalMetrics } from '@/lib/services/pg';
 import { myProfile } from '@/lib/services/pg/profile';
 import { withIdentity } from '@/lib/db/pg';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
+import { variantLabel } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
 
 export const dynamic = 'force-dynamic';
@@ -72,7 +72,7 @@ export default async function PullListPage({
                 <td className="py-1.5 font-mono">{m.number}</td>
                 <td className="py-1.5 font-medium">{m.name}</td>
                 <td className="py-1.5 text-neutral-600">
-                  {VARIANT_LABEL[m.variant as Variant]}{m.rarity ? ` · ${m.rarity}` : ''}
+                  {variantLabel(m.variant)}{m.rarity ? ` · ${m.rarity}` : ''}
                 </td>
                 <td className="py-1.5 text-right font-mono">
                   {m.market_cents === null ? '—' : money(m.market_cents)}

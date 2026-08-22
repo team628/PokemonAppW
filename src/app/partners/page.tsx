@@ -9,7 +9,7 @@ import {
 } from '@/lib/services/pg';
 import { withIdentity } from '@/lib/db/pg';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
+import { variantLabel } from '@/lib/catalog/variants';
 import { CardArt, Disclosure, Money, Progress, SectionTitle } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
@@ -216,7 +216,7 @@ export default async function PartnersPage({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold">{d.name}</p>
                     <p className="num truncate text-[10px] text-ink-mute">
-                      #{d.number} · {d.set_name} · {VARIANT_LABEL[d.variant as Variant]}
+                      #{d.number} · {d.set_name} · {variantLabel(d.variant)}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">

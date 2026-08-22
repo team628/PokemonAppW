@@ -1,5 +1,5 @@
 import { withIdentity } from '../db/pg';
-import { isVariant, primaryVariant, type Variant } from '../catalog/variants';
+import { canonicaliseVariantToken, primaryVariant, type Variant } from '../catalog/variants';
 import { CONDITIONS, type Condition } from '../domain/conditions';
 
 /**
@@ -25,7 +25,8 @@ export interface ParsedRow {
   nameHint: string | null;
   quantity: number;
   condition: Condition;
-  variant: Variant | null;
+  /** A base finish OR a `finish__treatment` printing token (migration 0021). */
+  variant: string | null;
   paidCents: number | null;
 }
 
@@ -34,7 +35,7 @@ export interface MatchedRow extends ParsedRow {
   cardId?: string;
   cardName?: string;
   setName?: string;
-  resolvedVariant?: Variant;
+  resolvedVariant?: string;
   /** Why this row could not be resolved, or which alternatives collided. */
   reason?: string;
   candidates?: { cardId: string; label: string }[];
@@ -146,7 +147,8 @@ export function parseRows(text: string): { rows: ParsedRow[]; header: string[]; 
 
     const qty = parseInt(at('quantity') || '1', 10);
     const conditionRaw = at('condition').toLowerCase();
-    const variantRaw = at('variant').toLowerCase();
+    const variantCell = at('variant');
+    const variantRaw = variantCell.toLowerCase();
     const priceRaw = at('price').replace(/[^0-9.]/g, '');
 
     // "4/102" and "SV049/SV122" both mean the left-hand side.
@@ -160,12 +162,49 @@ export function parseRows(text: string): { rows: ParsedRow[]; header: string[]; 
       nameHint: at('name') || null,
       quantity: Number.isFinite(qty) && qty > 0 ? Math.min(qty, 999) : 1,
       condition: toCondition(conditionRaw),
-      variant: VARIANT_ALIASES[variantRaw] ?? (isVariant(variantRaw) ? variantRaw : null),
+      // Human aliases ("reverse holo") first; then the canonical machine token
+      // ("holofoil__staff", "reverseHolofoil__winner") preserving its case, so a
+      // CSV this app exported round-trips exactly, treatment intact.
+      variant: VARIANT_ALIASES[variantRaw] ?? canonicaliseVariantToken(variantCell),
       paidCents: priceRaw ? Math.round(parseFloat(priceRaw) * 100) : null,
     });
   }
 
   return { rows, header, recognised: Object.keys(idx) };
+}
+
+// ------------------------------------------------------------------ export --
+
+export interface ExportRow {
+  set_id: string;
+  number: string;
+  name: string;
+  variant: string;      // canonical token, incl. `finish__treatment`
+  condition: Condition;
+  quantity: number;
+  paid_cents: number | null;
+}
+
+const csvEscape = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+
+/**
+ * Serialise holdings to CSV whose `Variant` column carries the exact stored
+ * token (treatment intact). The header set is the one `parseRows` recognises, so
+ * export → CSV → import is a faithful round-trip; legacy base tokens are written
+ * verbatim and re-read unchanged.
+ */
+export function serializeCollectionCsv(rows: ExportRow[]): string {
+  const header = ['Set', 'Number', 'Name', 'Variant', 'Condition', 'Quantity', 'Paid'];
+  const lines = [header.join(',')];
+  for (const r of rows) {
+    lines.push(
+      [
+        r.set_id, r.number, r.name, r.variant, r.condition, String(r.quantity),
+        r.paid_cents != null ? (r.paid_cents / 100).toFixed(2) : '',
+      ].map((c) => csvEscape(String(c ?? ''))).join(','),
+    );
+  }
+  return lines.join('\n');
 }
 
 // ----------------------------------------------------------------- matching --
@@ -246,13 +285,14 @@ export async function matchRows(userId: string, rows: ParsedRow[]): Promise<Impo
     if (hits.length === 1) {
       const hit = hits[0]!;
       const available = await variantsFor(hit.id);
-      const names = available.map((v) => v.variant as Variant);
-      // An explicitly stated printing is honoured only if the card has it.
-      const resolved =
+      const names = available.map((v) => v.variant);
+      // An explicitly stated printing (base finish OR treatment) is honoured
+      // only if the card actually has it — the DB stays authoritative.
+      const resolved: string =
         row.variant && names.includes(row.variant)
           ? row.variant
-          : (available.find((v) => v.is_primary)?.variant as Variant | undefined) ??
-            primaryVariant(names);
+          : available.find((v) => v.is_primary)?.variant ??
+            primaryVariant(names.filter((n): n is Variant => !n.includes('__')));
 
       out.push({
         ...row,
