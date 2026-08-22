@@ -185,6 +185,30 @@ export async function ingestCatalog(tx: SyncTx, scope: Scope = {}): Promise<void
   }
 }
 
+/**
+ * The (edition, finish) identity axes for a base variant token, derived exactly
+ * as migration 0017's backfill does (`ilike` order preserved): a lossless
+ * relabel of the token, never a price or catalog change. Keeps a fresh ingest's
+ * card_variants rows unique under migration 0021's identity index instead of
+ * collapsing every finish of a card to the same null-null identity.
+ */
+function identityAxes(variant: string): { finish: string; edition: string | null } {
+  const v = variant.toLowerCase();
+  const finish = v.includes('reverseholofoil')
+    ? 'Reverse Holofoil'
+    : v.includes('holofoil')
+      ? 'Holofoil'
+      : 'Normal';
+  const edition = v.startsWith('1stedition')
+    ? '1st Edition'
+    : v.startsWith('unlimited')
+      ? 'Unlimited'
+      : v.startsWith('shadowless')
+        ? 'Shadowless'
+        : null;
+  return { finish, edition };
+}
+
 export async function ingestPrices(tx: SyncTx, scope: Scope = {}): Promise<void> {
   const log = scope.log ?? (() => {});
   const all: ProviderSet[] = await provider.listSets();
@@ -285,7 +309,8 @@ export async function ingestPrices(tx: SyncTx, scope: Scope = {}): Promise<void>
             tcgVariants.includes(v) || (v === 'reverseHolofoil' && cmReverse)
               ? 'market_data'
               : tcgVariants.length ? 'inferred' : isCovered ? 'market_data' : 'inferred';
-          variantRows.push([q.cardId, v, source, v === primary]);
+          const { finish, edition } = identityAxes(v);
+          variantRows.push([q.cardId, v, source, v === primary, finish, edition]);
         }
 
         if (q.tcgplayer?.prices && tcgDate) {
@@ -322,11 +347,20 @@ export async function ingestPrices(tx: SyncTx, scope: Scope = {}): Promise<void>
         setReleaseDate: setMeta.get(meta.set_id)?.releaseDate ?? null,
       });
       const primary = primaryVariant(vs);
-      for (const v of vs) variantRows.push([id, v, 'inferred', v === primary]);
+      for (const v of vs) {
+        const { finish, edition } = identityAxes(v);
+        variantRows.push([id, v, 'inferred', v === primary, finish, edition]);
+      }
       inferredCards++;
     }
 
-    await insertBatch(tx, 'public.card_variants', ['card_id', 'variant', 'source', 'is_primary'], variantRows,
+    // finish + edition are set on insert so each token maps to a distinct
+    // (card_id, edition, finish, treatment, language) identity — the uniqueness
+    // migration 0021 enforces. Without them a fresh ingest would give every
+    // finish variant of a card the same null-null identity and collide. They are
+    // NOT overwritten on conflict: an existing row keeps whatever it was labelled.
+    await insertBatch(tx, 'public.card_variants',
+      ['card_id', 'variant', 'source', 'is_primary', 'finish', 'edition'], variantRows,
       `on conflict (card_id, variant) do update set source = excluded.source, is_primary = excluded.is_primary`,
       ['card_id', 'variant']);
 
