@@ -43,7 +43,9 @@ function http(method, url, { headers = {}, body, cookie } = {}) {
   return { status, body: rawBody, json };
 }
 const grantInvite = (email) => http('POST', `${SUPABASE_URL}/rest/v1/rpc/grant_beta_invite`, { headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` }, body: { p_email: email, p_note: 'live-trace' } });
-const adminCreate = (email, password) => http('POST', `${AUTH}/admin/users`, { headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` }, body: { email, password, email_confirm: true, user_metadata: { display_name: 'LiveTrace' } } });
+// Ordinary public signup (autoconfirm on) — the same path the app's /signup uses.
+// invite_code travels as user metadata; the DB trigger validates+consumes it.
+const publicSignup = (email, password, inviteCode) => http('POST', `${AUTH}/signup`, { headers: { apikey: ANON }, body: { email, password, data: { display_name: 'LiveTrace', invite_code: inviteCode } } });
 const adminDelete = (id) => { if (id) http('DELETE', `${AUTH}/admin/users/${id}`, { headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } }); };
 function signIn(email, password) {
   const r = http('POST', `${AUTH}/token?grant_type=password`, { headers: { apikey: ANON }, body: { email, password } });
@@ -79,11 +81,14 @@ async function main() {
   const PW = `LiveTrace-${stamp}-x`;
   let uid;
   try {
-    grantInvite(email);
-    const c = adminCreate(email, PW);
-    uid = c.json?.id;
-    console.log(`test user create: status ${c.status} id ${uid || '(none) ' + c.body.slice(0, 160)}`);
-    if (!uid) throw new Error('could not create test user');
+    // allow-list this email (gate Path 1), then sign up through the LIVE project's
+    // auth exactly as a real collector would.
+    const gi = grantInvite(email);
+    console.log(`grant_beta_invite: status ${gi.status}`);
+    const su = publicSignup(email, PW, '');
+    uid = su.json?.id || su.json?.user?.id;
+    console.log(`public signup: status ${su.status} id ${uid || '(none) ' + su.body.slice(0, 160)}`);
+    if (!uid) throw new Error('could not sign up test user');
 
     const session = signIn(email, PW);
     const cookie = sessionCookie(session);
