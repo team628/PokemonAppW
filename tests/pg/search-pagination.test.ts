@@ -109,6 +109,26 @@ describe('RC-3 pagination boundaries', () => {
   });
 });
 
+// Migration 0025: a collector types a NAME + NUMBER for one specific printing.
+// Before 0025 the number pin only fired for "<setid><number>", so "Charizard 125"
+// / "Pikachu SWSH020" / "Gengar SWSH241" buried the target past the first window.
+describe('0025 name+number resolves the exact printing on page 1', () => {
+  const CASES: Array<[string, string]> = [
+    ['Charizard 125', 'sv3-125'],
+    ['Pikachu SWSH020', 'swshp-SWSH020'],
+    ['Gengar SWSH052', 'swshp-SWSH052'],
+    ['Mew 8', 'basep-8'],
+  ];
+  for (const [q, id] of CASES) {
+    it(`"${q}" surfaces ${id} on the first page`, async () => {
+      const rows = await search(q, undefined, 30, 0);
+      const rank = rows.findIndex((r) => r.id === id);
+      expect(rank, `${id} not on page 1 for "${q}" (rank ${rank})`).toBeGreaterThanOrEqual(0);
+      expect(rank).toBeLessThan(30);
+    });
+  }
+});
+
 describe('RC-3 exact set/card-number ranks first', () => {
   it('"swshp SWSH020" returns swshp-SWSH020 as the first result', async () => {
     const rows = await search('swshp SWSH020');
