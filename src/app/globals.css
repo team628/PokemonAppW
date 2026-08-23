@@ -4,14 +4,19 @@
 
 :root {
   color-scheme: dark;
-  --bg: #0b0e14;
-  --panel: #121722;
-  --line: #1e2634;
+  --bg: #0a0d13;
+  --panel: #11151f;
+  --raise: #171c28;
+  --line: #222a3a;
   --mute: #8a94a6;
   --need: #ff8a3d;
   --have: #2dd4a7;
   --gold: #ffc93c;
   --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  /* Height of the bottom nav plus the device inset. Every scrolling surface
+     pads by this, so a CTA can never end up underneath the tab bar. */
+  --nav-h: calc(58px + var(--safe-b));
 }
 
 html,
@@ -35,16 +40,32 @@ body {
   letter-spacing: -0.01em;
 }
 
+/* The signature number. Tight, heavy, optically aligned. */
+.figure {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.035em;
+  font-weight: 800;
+  line-height: 0.92;
+}
+
 @layer components {
   .panel {
     @apply rounded-2xl border border-ink-line bg-ink-soft;
   }
+  .panel-raise {
+    @apply rounded-2xl border border-ink-line bg-ink-raise shadow-tile;
+  }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full border border-ink-line bg-ink-soft px-2.5 py-1 text-xs text-ink-mute;
+    @apply inline-flex items-center gap-1 rounded-full border border-ink-line bg-ink-soft px-2.5 py-1
+           text-[11px] font-medium text-ink-mute;
+  }
+  .chip-active {
+    @apply border-transparent bg-white text-ink;
   }
   .btn {
-    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold
-           transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex min-h-[46px] select-none items-center justify-center gap-2 rounded-xl px-4 text-sm
+           font-semibold transition active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
     @apply btn bg-white text-ink;
@@ -53,14 +74,22 @@ body {
     @apply btn bg-need text-ink;
   }
   .btn-ghost {
-    @apply btn border border-ink-line bg-ink-soft text-white hover:border-white/25;
+    @apply btn border border-ink-line bg-ink-soft text-white hover:border-ink-edge;
+  }
+  .btn-quiet {
+    @apply btn min-h-0 px-3 py-2 text-xs text-ink-mute hover:text-white;
   }
   .field {
     @apply w-full rounded-xl border border-ink-line bg-ink px-3 py-3 text-[16px] text-white
-           outline-none placeholder:text-ink-mute focus:border-white/30;
+           outline-none placeholder:text-ink-dim focus:border-ink-edge;
   }
   .label {
-    @apply text-[11px] font-semibold uppercase tracking-[.12em] text-ink-mute;
+    @apply text-[10px] font-semibold uppercase tracking-[.14em] text-ink-mute;
+  }
+  /* One-handed horizontal control bar that sticks under the top bar. */
+  .toolbar {
+    @apply sticky z-20 -mx-4 flex items-center gap-1.5 overflow-x-auto border-b border-ink-line
+           bg-ink/95 px-4 py-2.5 backdrop-blur;
   }
 }
 
@@ -68,7 +97,7 @@ body {
 .rail {
   scrollbar-width: none;
   -ms-overflow-style: none;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
 }
 .rail::-webkit-scrollbar {
   display: none;
@@ -76,14 +105,71 @@ body {
 .rail > * {
   scroll-snap-align: start;
 }
+/* A rail that runs to the screen edge but still starts inside the page gutter.
+   Padding on a scroll container is unreliable across engines for the trailing
+   edge, so the gutter is expressed as spacers instead. */
+.rail-bleed {
+  margin-left: -1rem;
+  margin-right: -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  scroll-padding-left: 1rem;
+}
+.rail-bleed::after {
+  content: '';
+  flex: 0 0 1px;
+}
 
-/* Card art: keeps the 5:7 trading-card ratio at any width. */
+/* Card art: keeps the 5:7 trading-card ratio at any width. Declared as an
+   aspect-ratio rather than a fixed height so a grid never shifts as art
+   arrives. */
 .card-art {
   aspect-ratio: 245 / 342;
 }
 
+/* A binder pocket. The card sits *in* something — inset shadow and a lip —
+   rather than floating on the page. */
+.pocket {
+  aspect-ratio: 245 / 342;
+  border-radius: 0.5rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(0, 0, 0, 0.22));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+/* An empty pocket reads as a hole in the set, not as a loading state. */
+.pocket-empty {
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.018) 0 6px,
+      transparent 6px 12px
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.28));
+}
+
 .dim {
-  filter: grayscale(1) brightness(0.45);
+  filter: grayscale(1) brightness(0.42) contrast(0.9);
+}
+
+/* Skeletons: a moving highlight over a surface, never a spinner. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--panel);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  animation: shimmerSweep 1.4s infinite;
+}
+@keyframes shimmerSweep {
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes confettiFall {
@@ -101,6 +187,13 @@ body {
   z-index: 60;
 }
 
+/* Focus is always visible and always the same shape. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #7de9cb;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -108,5 +201,8 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  .skeleton::after {
+    animation: none;
   }
 }

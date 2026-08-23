@@ -1,11 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useOptimistic, useState, useTransition } from 'react';
+import { useMemo, useOptimistic, useRef, useState, useTransition } from 'react';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_SHORT, type Variant } from '@/lib/catalog/variants';
+import { variantShort, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
-import { CardArt } from './ui';
+import { CardArt } from './CardArt';
+import { NeedFigure } from './NeedFigure';
+import { useWindowedGrid } from './useWindowed';
+import { CompletionMoment } from './CompletionMoment';
+import type { CompletionCardData } from './CompletionCard';
 
 export interface GridSlot {
   cardId: string;
@@ -40,11 +44,14 @@ export function SetGrid({
   setId,
   mode,
   slots: initial,
+  identity,
   initialFilter = 'all',
 }: {
   setId: string;
   mode: GoalMode;
   slots: GridSlot[];
+  /** Enough set identity to draw a completion card the instant it is earned. */
+  identity: Omit<CompletionCardData, 'cardCount' | 'completedAt' | 'completeCents'>;
   initialFilter?: Filter;
 }) {
   const [slots, setSlots] = useState(initial);
@@ -61,6 +68,8 @@ export function SetGrid({
   const [sort, setSort] = useState<Sort>('number');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const gridRef = useRef<HTMLUListElement>(null);
+  const [completed, setCompleted] = useState<CompletionCardData | null>(null);
 
   const visible = useMemo(() => {
     const list = optimistic.filter((s) =>
@@ -75,6 +84,11 @@ export function SetGrid({
     else sorted.sort((a, b) => a.numberSort - b.numberSort || a.variant.localeCompare(b.variant));
     return sorted;
   }, [optimistic, filter, sort]);
+
+  // Only the rows near the viewport are in the document. A master set is 400+
+  // slots; without this the browser lays out every one of them before the first
+  // card paints, and every ownership toggle reconciles the whole grid.
+  const window_ = useWindowedGrid(gridRef, visible.length, `${filter}:${sort}`);
 
   const live = useMemo(() => {
     const owned = optimistic.filter((s) => s.owned);
@@ -107,7 +121,8 @@ export function SetGrid({
             withMode: mode,
           }),
         });
-        if (!res.ok) throw new Error((await res.json()).error ?? 'Request failed');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Request failed');
         setSlots((prev) =>
           prev.map((s) =>
             s.cardId === slot.cardId && s.variant === slot.variant
@@ -115,47 +130,83 @@ export function SetGrid({
               : s,
           ),
         );
+        // The set finishing under your thumb is the moment the whole product
+        // exists for, so it happens here rather than on the next page load. The
+        // server decides whether it happened: `milestones` only carries
+        // 'complete' on the transition, because the database inserts that row
+        // once per goal.
+        if (Array.isArray(data.milestones) && data.milestones.includes('complete')) {
+          setCompleted({
+            ...identity,
+            cardCount: data.metrics?.requiredCount ?? optimistic.length,
+            completeCents: data.metrics?.completeCents ?? 0,
+            completedAt: new Date().toISOString(),
+          });
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not save that change.');
       }
     });
   }
 
+  function closeCompletion() {
+    setCompleted(null);
+    // Shown once. Without this the dashboard would replay it on the next load.
+    fetch('/api/milestones/seen', { method: 'POST' }).catch(() => {});
+  }
+
   return (
-    <div>
-      <div className="sticky top-[57px] z-20 -mx-4 border-b border-ink-line bg-ink/95 px-4 py-3 backdrop-blur">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="num text-2xl font-black leading-none text-need">{money(live.need)}</p>
-            <p className="text-[10px] font-bold uppercase tracking-[.18em] text-need/80">
-              {live.unpricedMissing > 0 ? 'To go (at least)' : 'To go'}
+    <div className="mt-4">
+      {completed && <CompletionMoment data={completed} onDismiss={closeCompletion} />}
+      {/* Compact enough to leave the cards visible while scrolling, and every
+          control sits within one-handed reach of the bottom of the screen. */}
+      <div className="sticky top-[57px] z-20 -mx-4 border-b border-ink-line bg-ink/95 px-4 py-2.5 backdrop-blur-lg lg:mx-0 lg:rounded-xl lg:border lg:border-ink-line">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <NeedFigure
+              cents={live.need}
+              className={`block text-[22px] ${live.missingCount === 0 ? 'text-have' : 'text-need'}`}
+            />
+            <p className="num text-[10px] text-ink-mute">
+              {live.missingCount === 0
+                ? 'set complete'
+                : live.unpricedMissing > 0
+                  ? 'left · at least'
+                  : 'left to complete'}{' '}
+              · {live.missingCount} left
             </p>
           </div>
-          <div className="text-right">
-            <p className="num text-sm font-bold">{(live.percent * 100).toFixed(1)}%</p>
-            <p className="num text-[11px] text-ink-mute">
-              {live.ownedCount}/{live.required} · {live.missingCount} left
+          <div className="shrink-0 text-right">
+            <p className="num text-[13px] font-bold">{(live.percent * 100).toFixed(1)}%</p>
+            <p className="num text-[10px] text-ink-mute">
+              {live.ownedCount}/{live.required}
             </p>
           </div>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[.08]">
           <div
-            className="h-full rounded-full bg-need transition-[width] duration-300"
+            className={`h-full rounded-full transition-[width] duration-500 ease-out ${
+              live.missingCount === 0 ? 'bg-have' : 'bg-need'
+            }`}
             style={{ width: `${live.percent * 100}%` }}
           />
         </div>
 
-        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto">
+        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto">
           {(['all', 'missing', 'owned'] as Filter[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               aria-pressed={filter === f}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                filter === f ? 'bg-white text-ink' : 'border border-ink-line text-ink-mute'
+              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                filter === f ? 'chip-active' : 'border border-ink-line text-ink-mute'
               }`}
             >
-              {f === 'all' ? `All ${live.required}` : f === 'missing' ? `Missing ${live.missingCount}` : `Have ${live.ownedCount}`}
+              {f === 'all'
+                ? `All ${live.required}`
+                : f === 'missing'
+                  ? `Missing ${live.missingCount}`
+                  : `Have ${live.ownedCount}`}
             </button>
           ))}
           <span className="ml-auto shrink-0" />
@@ -163,7 +214,7 @@ export function SetGrid({
             value={sort}
             onChange={(e) => setSort(e.target.value as Sort)}
             aria-label="Sort cards"
-            className="shrink-0 rounded-full border border-ink-line bg-ink px-2.5 py-1.5 text-xs text-ink-mute"
+            className="shrink-0 rounded-full border border-ink-line bg-ink px-2.5 py-1.5 text-[11px] text-ink-mute"
           >
             <option value="number">By number</option>
             <option value="value">Most valuable</option>
@@ -185,25 +236,39 @@ export function SetGrid({
             : 'No cards match this filter yet.'}
         </p>
       ) : (
-        <ul className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {visible.map((s) => (
-            <li key={`${s.cardId}-${s.variant}`}>
+        <ul
+          ref={gridRef}
+          style={window_.style}
+          aria-label={`${visible.length} cards`}
+          className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7"
+        >
+          {visible.slice(window_.start, window_.end).map((s, i) => (
+            <li
+              key={`${s.cardId}-${s.variant}`}
+              aria-setsize={visible.length}
+              aria-posinset={window_.start + i + 1}
+            >
               <button
                 onClick={() => toggle(s)}
                 disabled={pending}
                 aria-pressed={s.owned}
                 aria-label={`${s.owned ? 'Remove' : 'Add'} ${s.name} number ${s.number}${
-                  s.variant !== 'normal' ? ` ${VARIANT_SHORT[s.variant]}` : ''
+                  s.variant !== 'normal' ? ` ${variantShort(s.variant)}` : ''
                 }`}
                 className={`group relative block w-full rounded-lg transition active:scale-95 ${
                   s.owned ? '' : 'opacity-95'
                 }`}
               >
-                <CardArt src={s.imageSmall} alt={s.name} owned={s.owned} />
+                <CardArt
+                  src={s.imageSmall}
+                  alt={s.name}
+                  owned={s.owned}
+                  badge={mode === 'master' && s.variant !== 'normal' ? variantShort(s.variant) : null}
+                />
                 {s.owned && (
                   <span
                     aria-hidden
-                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-have text-[11px] font-black text-ink shadow"
+                    className="absolute right-1 top-1 flex h-5 w-5 animate-seat items-center justify-center rounded-full bg-have text-[11px] font-black text-ink shadow-slot"
                   >
                     ✓
                   </span>
@@ -211,11 +276,6 @@ export function SetGrid({
                 {s.quantity > 1 && (
                   <span className="num absolute left-1 top-1 rounded-md bg-ink/85 px-1.5 py-0.5 text-[10px] font-bold">
                     ×{s.quantity}
-                  </span>
-                )}
-                {mode === 'master' && s.variant !== 'normal' && (
-                  <span className="num absolute bottom-1 left-1 rounded bg-ink/85 px-1 py-0.5 text-[9px] font-bold text-gold">
-                    {VARIANT_SHORT[s.variant]}
                   </span>
                 )}
               </button>

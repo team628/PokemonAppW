@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { money } from '@/lib/pricing/quote';
-import { VARIANT_LABEL, type Variant } from '@/lib/catalog/variants';
+import { variantShort, type Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
-import { CardArt } from './ui';
+import { CardArt } from './CardArt';
+import { NeedFigure } from './NeedFigure';
+import { useWindowedGrid } from './useWindowed';
 
 export interface PullSlot {
   cardId: string;
@@ -34,9 +36,18 @@ interface QueuedFind {
   variant: Variant;
   paidCents: number | null;
   withMode: GoalMode;
+  name: string;
+  number: string;
 }
 
-const QUEUE_KEY = 'setvalue.show.queue.v1';
+interface RejectedFind extends QueuedFind {
+  reason: string;
+}
+
+type SendOutcome = 'sent' | 'retry' | 'rejected';
+
+const QUEUE_KEY = 'setvalue.show.queue.v2';
+const REJECT_KEY = 'setvalue.show.rejected.v1';
 
 /**
  * Card Show mode.
@@ -71,9 +82,11 @@ export function ShowMode({
   );
   const [tab, setTab] = useState<'pull' | 'lookup'>('pull');
   const [queue, setQueue] = useState<QueuedFind[]>([]);
+  const [rejected, setRejected] = useState<RejectedFind[]>([]);
   const [online, setOnline] = useState(true);
   const [flash, setFlash] = useState<{ name: string; saved: number | null } | null>(null);
   const [priceFor, setPriceFor] = useState<PullSlot | null>(null);
+  const [hunt, setHunt] = useState('');
   const activeSet = sets.find((s) => s.id === setId);
   const mode: GoalMode = activeSet?.mode ?? 'main';
 
@@ -82,6 +95,8 @@ export function ShowMode({
     try {
       const raw = localStorage.getItem(QUEUE_KEY);
       if (raw) setQueue(JSON.parse(raw));
+      const rej = localStorage.getItem(REJECT_KEY);
+      if (rej) setRejected(JSON.parse(rej));
     } catch {
       /* storage unavailable — mode still works, just without replay */
     }
@@ -105,10 +120,29 @@ export function ShowMode({
     }
   }, []);
 
+  const persistRejected = useCallback((r: RejectedFind[]) => {
+    setRejected(r);
+    try {
+      localStorage.setItem(REJECT_KEY, JSON.stringify(r));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  /**
+   * Sends one find.
+   *
+   * The distinction that matters: a network failure or a server fault is worth
+   * retrying, but a 4xx never becomes valid by being sent again. Retrying those
+   * forever left cards stuck in a queue under a banner promising they would
+   * sync — the worst possible failure for this screen, because the collector
+   * has already put the card in the box and moved on.
+   */
   const send = useCallback(
-    async (item: QueuedFind): Promise<boolean> => {
+    async (item: QueuedFind): Promise<SendOutcome> => {
+      let res: Response;
       try {
-        const res = await fetch('/api/show/find', {
+        res = await fetch('/api/show/find', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -120,30 +154,54 @@ export function ShowMode({
             idempotencyKey: item.key,
           }),
         });
-        if (!res.ok) return false;
-        const data = await res.json();
-        if (data.summary) setSummary(data.summary);
-        if (data.metrics && data.metrics.setId === setId) {
-          setNeedCents(data.metrics.needCents);
-          setMissingCount(data.metrics.missingCount);
-        }
-        return true;
       } catch {
-        return false;
+        return 'retry'; // offline or connection dropped
       }
+
+      if (res.status === 408 || res.status === 429 || res.status >= 500) return 'retry';
+
+      if (!res.ok) {
+        let reason = `Rejected (${res.status})`;
+        try {
+          const body = await res.json();
+          if (body?.error) reason = String(body.error);
+        } catch {
+          /* keep the status-code reason */
+        }
+        rejectedRef.current.push({ ...item, reason });
+        return 'rejected';
+      }
+
+      const data = await res.json();
+      if (data.summary) setSummary(data.summary);
+      if (data.metrics && data.metrics.setId === setId) {
+        setNeedCents(data.metrics.needCents);
+        setMissingCount(data.metrics.missingCount);
+      }
+      return 'sent';
     },
     [setId],
   );
 
   const flushRef = useRef(false);
+  const pullRef = useRef<HTMLUListElement>(null);
+  const rejectedRef = useRef<RejectedFind[]>([]);
+
   const flush = useCallback(async () => {
     if (flushRef.current || !queue.length) return;
     flushRef.current = true;
+    rejectedRef.current = [];
     const remaining: QueuedFind[] = [];
-    for (const item of queue) if (!(await send(item))) remaining.push(item);
+    for (const item of queue) {
+      if ((await send(item)) === 'retry') remaining.push(item);
+    }
     persist(remaining);
+    if (rejectedRef.current.length) {
+      persistRejected([...rejected, ...rejectedRef.current]);
+      rejectedRef.current = [];
+    }
     flushRef.current = false;
-  }, [queue, send, persist]);
+  }, [queue, send, persist, persistRejected, rejected]);
 
   useEffect(() => {
     if (online && queue.length) void flush();
@@ -158,6 +216,8 @@ export function ShowMode({
       variant: slot.variant,
       paidCents,
       withMode: mode,
+      name: slot.name,
+      number: slot.number,
     };
 
     // Local truth updates first: the card is in your hand, the screen should
@@ -177,7 +237,25 @@ export function ShowMode({
     setTimeout(() => setFlash(null), 2200);
     setPriceFor(null);
 
-    if (!(await send(item))) persist([...queue, item]);
+    rejectedRef.current = [];
+    const outcome = await send(item);
+    if (outcome === 'retry') persist([...queue, item]);
+    if (outcome === 'rejected' && rejectedRef.current.length) {
+      // Put the card back on the pull list — it was never saved.
+      setSlots((prev) =>
+        [...prev, slot].sort((a, b) => Number(a.number) - Number(b.number) || a.number.localeCompare(b.number)),
+      );
+      setMissingCount((n) => n + 1);
+      setNeedCents((c) => c + (slot.marketCents ?? 0));
+      setSummary((s) => ({
+        finds: Math.max(0, s.finds - 1),
+        spentCents: Math.max(0, s.spentCents - (paidCents ?? 0)),
+        marketCents: Math.max(0, s.marketCents - (slot.marketCents ?? 0)),
+      }));
+      setFlash(null);
+      persistRejected([...rejected, ...rejectedRef.current]);
+      rejectedRef.current = [];
+    }
   }
 
   const listValue = useMemo(
@@ -185,21 +263,34 @@ export function ShowMode({
     [slots],
   );
 
+  // Narrowing a 300-card hunt by number or name, without leaving the list.
+  const visibleSlots = useMemo(() => {
+    const q = hunt.trim().toLowerCase();
+    if (!q) return slots;
+    return slots.filter(
+      (s) => s.number.toLowerCase().startsWith(q) || s.name.toLowerCase().includes(q),
+    );
+  }, [slots, hunt]);
+
+  // The pull list for a master-set hunt runs to hundreds of rows, each with its
+  // own artwork. Only the rows near the viewport are in the document.
+  const pullWindow = useWindowedGrid(pullRef, visibleSlots.length, hunt);
+
   return (
     <div className="pb-4">
       {/* running tally — the number that makes the session feel like progress */}
-      <div className="panel sticky top-[57px] z-20 mb-4 px-4 py-3">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="label">Still need{activeSet ? ` · ${activeSet.name}` : ''}</p>
-            <p className="num text-3xl font-black leading-none text-need">{money(needCents)}</p>
-            <p className="num mt-1 text-[11px] text-ink-mute">{missingCount} cards left</p>
+      <div className="panel sticky top-[57px] z-20 mb-3 px-4 py-2.5">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="label truncate">Still need{activeSet ? ` · ${activeSet.name}` : ''}</p>
+            <NeedFigure cents={needCents} className="block text-[27px] text-need" />
+            <p className="num mt-0.5 text-[11px] text-ink-mute">{missingCount} cards left</p>
           </div>
-          <div className="text-right">
+          <div className="shrink-0 text-right">
             <p className="label">This hunt</p>
-            <p className="num text-lg font-bold">{summary.finds} found</p>
-            <p className="num text-[11px] text-ink-mute">
-              {money(summary.spentCents)} spent · {money(summary.marketCents)} market
+            <p className="num text-[17px] font-bold">{summary.finds} found</p>
+            <p className="num text-[10px] text-ink-mute">
+              {money(summary.spentCents)} spent
             </p>
           </div>
         </div>
@@ -209,6 +300,29 @@ export function ShowMode({
               ? `Syncing ${queue.length} find${queue.length === 1 ? '' : 's'}…`
               : `Offline — ${queue.length} find${queue.length === 1 ? '' : 's'} saved on this device and will sync automatically.`}
           </p>
+        )}
+        {rejected.length > 0 && (
+          <div className="mt-2 rounded-lg border border-need/40 bg-need/10 px-2.5 py-2">
+            <p className="text-[11px] font-bold text-need">
+              {rejected.length} find{rejected.length === 1 ? ' was' : 's were'} not saved
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {rejected.slice(0, 4).map((r) => (
+                <li key={r.key} className="text-[11px] text-need/90">
+                  {r.name} #{r.number} — {r.reason}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-[10px] text-need/80">
+              These are back on the pull list. Retrying would not have helped.
+            </p>
+            <button
+              onClick={() => persistRejected([])}
+              className="mt-1.5 text-[11px] font-semibold text-need underline"
+            >
+              Dismiss
+            </button>
+          </div>
         )}
       </div>
 
@@ -272,33 +386,74 @@ export function ShowMode({
         </div>
       ) : (
         <>
+          {/* Digging through a box is a number-order job, so the list stays in
+              number order and the filter narrows rather than reorders. */}
+          <div className="mb-2.5 flex items-center gap-2">
+            <input
+              value={hunt}
+              onChange={(e) => setHunt(e.target.value)}
+              inputMode="search"
+              type="search"
+              placeholder="Jump to a number or name…"
+              aria-label="Filter the pull list"
+              className="field py-2.5 text-[15px]"
+            />
+            {hunt && (
+              <button onClick={() => setHunt('')} className="btn-quiet shrink-0">
+                Clear
+              </button>
+            )}
+          </div>
           <p className="mb-2 text-[11px] text-ink-mute">
-            Sorted by card number so it tracks the order cards sit in a binder or box.{' '}
-            {money(listValue)} buys this whole list at the lowest current listings.
+            {visibleSlots.length === slots.length ? (
+              <>
+                {slots.length} to find · {money(listValue)} at the lowest listings
+              </>
+            ) : (
+              <>
+                {visibleSlots.length} of {slots.length} shown
+              </>
+            )}
           </p>
-          <ul className="space-y-2">
-            {slots.map((s) => (
-              <li key={`${s.cardId}-${s.variant}`} className="panel flex items-center gap-3 p-2.5">
+          <ul ref={pullRef} style={pullWindow.style} className="grid grid-cols-1 gap-2">
+            {visibleSlots.slice(pullWindow.start, pullWindow.end).map((s, i) => (
+              <li
+                key={`${s.cardId}-${s.variant}`}
+                aria-setsize={visibleSlots.length}
+                aria-posinset={pullWindow.start + i + 1}
+                className="panel flex items-center gap-3 p-2.5"
+              >
                 <div className="w-[52px] shrink-0">
                   <CardArt src={s.imageSmall} alt={s.name} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{s.name}</p>
-                  <p className="num text-[11px] text-ink-mute">
+                  <p className="num text-[11px] font-bold text-ink-mute">
                     #{s.number}
-                    {s.variant !== 'normal' && ` · ${VARIANT_LABEL[s.variant]}`}
-                    {s.rarity && ` · ${s.rarity}`}
+                    {s.variant !== 'normal' && (
+                      <span className="ml-1 text-gold">{variantShort(s.variant)}</span>
+                    )}
                   </p>
-                  <p className="num mt-0.5 text-xs font-semibold text-need">
-                    {s.marketCents === null ? 'no market price' : `${money(s.marketCents)} market`}
-                    {s.acquisitionCents !== null && s.acquisitionCents !== s.marketCents && (
-                      <span className="text-ink-mute"> · from {money(s.acquisitionCents)}</span>
+                  <p className="truncate text-[14px] font-bold leading-tight">{s.name}</p>
+                  {/* Market is what it is worth; the second figure is what it
+                      would actually cost to buy today. Repeating the market
+                      price as "need impact" would have said nothing new — the
+                      tally above already falls by exactly that much. */}
+                  <p className="num mt-0.5 text-[12px] font-semibold">
+                    {s.marketCents === null ? (
+                      <span className="text-ink-dim">no market price</span>
+                    ) : (
+                      <>
+                        {money(s.marketCents)}
+                        {s.acquisitionCents !== null && s.acquisitionCents !== s.marketCents && (
+                          <span className="text-have"> · from {money(s.acquisitionCents)}</span>
+                        )}
+                      </>
                     )}
                   </p>
                 </div>
                 <button
                   onClick={() => setPriceFor(s)}
-                  className="btn-need min-h-[52px] shrink-0 px-4 text-xs"
+                  className="btn-need min-h-[62px] w-[86px] shrink-0 px-0 text-[13px] font-black leading-tight"
                   aria-label={`Mark ${s.name} number ${s.number} as found`}
                 >
                   FOUND IT
@@ -418,31 +573,86 @@ function Lookup({
   setId: string | null;
   onFound: (slot: PullSlot, paidCents: number | null) => void;
 }) {
+  const PAGE = 30;
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [reported, setReported] = useState<string | null>(null);
+
+  // One loader for both the first page and each "show more" page. Appending by
+  // offset walks the full ranked result set, so no printing is ever dropped —
+  // heavily reprinted names (Pikachu has 287 printings) stay fully reachable.
+  const loadPage = async (term: string, offset: number, append: boolean) => {
+    const url =
+      `/api/search?q=${encodeURIComponent(term)}` +
+      `${setId ? `&set=${setId}` : ''}&limit=${PAGE}&offset=${offset}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const rows: SearchHit[] = data.results ?? [];
+    setTotal(Number(data.total ?? rows.length));
+    setHasMore(Boolean(data.hasMore));
+    setHits((prev) => (append ? [...prev, ...rows] : rows));
+  };
 
   useEffect(() => {
+    setReported(null);
     const term = q.trim();
     if (term.length < 1) {
       setHits([]);
+      setTotal(0);
+      setHasMore(false);
       return;
     }
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const url = `/api/search?q=${encodeURIComponent(term)}${setId ? `&set=${setId}` : ''}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        setHits(data.results ?? []);
+        await loadPage(term, 0, false);
       } catch {
         setHits([]);
+        setTotal(0);
+        setHasMore(false);
       } finally {
         setLoading(false);
       }
     }, 180);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, setId]);
+
+  const loadMore = async () => {
+    const term = q.trim();
+    if (!term || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await loadPage(term, hits.length, true);
+    } catch {
+      // leave the current page in place; the button stays available to retry
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const reportGap = async () => {
+    const term = q.trim();
+    if (!term) return;
+    setReported(term);
+    try {
+      await fetch('/api/catalog-gap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ term, setId: setId ?? null, resultCount: hits.length }),
+      });
+    } catch {
+      // Best-effort: the collector's report is a nicety, not a blocking action.
+    }
+  };
+
+  const term = q.trim();
+  const showGapPrompt = term.length >= 2 && !loading;
+  const alreadyReported = reported === term;
 
   return (
     <div>
@@ -455,10 +665,15 @@ function Lookup({
         autoFocus
         className="field text-lg"
       />
-      <p className="mt-2 text-[11px] text-ink-mute">
+      <p className="mt-2 text-[11px] leading-relaxed text-ink-mute">
         {setId
           ? 'Type the number printed on the card — 4, 25, 151 — for an exact hit.'
-          : 'Searching every English set. Choose a set above to search by card number instead.'}
+          : 'Searching every English set. Choose a set above to search by card number instead.'}{' '}
+        <span className="text-ink-mute/80">
+          Photo recognition is not available in this build, so SetValue does not offer a
+          scan button it cannot stand behind. Set plus number is the fastest identification
+          it can make exactly.
+        </span>
       </p>
 
       {loading && <p className="mt-4 text-xs text-ink-mute">Searching…</p>}
@@ -499,6 +714,39 @@ function Lookup({
           </li>
         ))}
       </ul>
+
+      {hasMore && (
+        <button
+          type="button"
+          onClick={loadMore}
+          disabled={loadingMore}
+          className="btn-ghost mt-3 w-full text-xs"
+        >
+          {loadingMore
+            ? 'Loading more printings…'
+            : `Show more printings (${hits.length} of ${total})`}
+        </button>
+      )}
+
+      {showGapPrompt &&
+        (alreadyReported ? (
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-mute">
+            Thanks — we logged “{reported}” so we can add or make it findable. You can
+            keep searching with a different spelling in the meantime.
+          </p>
+        ) : (
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-mute">
+            {hits.length === 0 ? "Can't find it? " : "Not the card you meant? "}
+            <button
+              type="button"
+              onClick={reportGap}
+              className="font-semibold text-have underline underline-offset-2"
+            >
+              Tell us what you searched
+            </button>{' '}
+            and we'll review the gap.
+          </p>
+        ))}
     </div>
   );
 }

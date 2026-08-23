@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { MILESTONE_COPY, type MilestoneKind } from '@/lib/domain/goals';
-import { money } from '@/lib/pricing/quote';
+import { CompletionMoment } from './CompletionMoment';
+import type { CompletionCardData } from './CompletionCard';
 
 export interface MilestonePayload {
   kind: MilestoneKind;
@@ -11,6 +12,8 @@ export interface MilestonePayload {
   ownedCount: number;
   requiredCount: number;
   completeCents: number;
+  /** Present on every milestone; only a completion draws the card. */
+  completion: CompletionCardData;
 }
 
 /**
@@ -30,22 +33,34 @@ export function MilestoneToast({ milestones }: { milestones: MilestonePayload[] 
 
   if (!current) return null;
   const copy = MILESTONE_COPY[current.kind];
-  const isBig = current.kind === 'complete' || current.kind === 'one_left';
   const dismiss = () => setQueue((q) => q.slice(1));
 
-  if (!isBig) {
+  // A finished set gets the signature moment. Everything else gets a banner —
+  // if every milestone interrupted, people would learn to dismiss the one that
+  // actually matters.
+  if (current.kind === 'complete') {
+    return <CompletionMoment data={current.completion} onDismiss={dismiss} />;
+  }
+
+  if (current.kind === 'one_left') {
     return (
-      <div className="animate-slideUp fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md">
-        <div className="panel flex items-center gap-3 border-gold/40 bg-ink-soft px-4 py-3 shadow-2xl">
-          <span aria-hidden className="text-xl">🏅</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">{copy.title}</p>
-            <p className="truncate text-xs text-ink-mute">
-              {current.setName} · {copy.body}
-            </p>
-          </div>
-          <button onClick={dismiss} className="text-xs font-semibold text-ink-mute" aria-label="Dismiss">
-            Close
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={copy.title}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-ink/95 px-6 backdrop-blur-sm"
+      >
+        <div className="animate-pop w-full max-w-sm text-center">
+          <p className="text-[11px] font-bold uppercase tracking-[.34em] text-need">One left</p>
+          <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight">
+            {current.setName}
+          </h2>
+          <p className="num mt-3 text-[13px] text-ink-mute">
+            {current.ownedCount} of {current.requiredCount} · one card from finished
+          </p>
+          <p className="mt-4 text-sm leading-relaxed text-ink-mute">{copy.body}</p>
+          <button onClick={dismiss} className="btn-primary mt-7 w-full">
+            Go finish it
           </button>
         </div>
       </div>
@@ -53,66 +68,24 @@ export function MilestoneToast({ milestones }: { milestones: MilestonePayload[] 
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={copy.title}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/95 px-6 backdrop-blur-sm"
-    >
-      {current.kind === 'complete' && <Confetti />}
-      <div className="animate-pop w-full max-w-sm text-center">
-        <p className="text-6xl" aria-hidden>
-          {current.kind === 'complete' ? '🏆' : '🎯'}
-        </p>
-        <h2 className="mt-5 text-3xl font-black uppercase tracking-tight">
-          {current.kind === 'complete' ? 'Set Complete' : 'One Left'}
-        </h2>
-        <p className="mt-2 text-lg font-bold">{current.setName}</p>
-        <p className="mt-3 text-sm leading-relaxed text-ink-mute">{copy.body}</p>
-
-        {current.kind === 'complete' && (
-          <div className="panel mt-6 grid grid-cols-2 gap-px overflow-hidden bg-ink-line">
-            <div className="bg-ink-soft px-4 py-3">
-              <p className="label">Cards</p>
-              <p className="num mt-0.5 text-lg font-bold">{current.requiredCount}</p>
-            </div>
-            <div className="bg-ink-soft px-4 py-3">
-              <p className="label">Set value</p>
-              <p className="num mt-0.5 text-lg font-bold text-have">{money(current.completeCents)}</p>
-            </div>
-          </div>
-        )}
-
-        <button onClick={dismiss} className="btn-primary mt-6 w-full">
-          {current.kind === 'complete' ? 'Celebrate' : 'Go finish it'}
+    <div className="animate-slideUp fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md">
+      <div className="panel flex items-center gap-3 border-gold/40 bg-ink-soft px-4 py-3 shadow-2xl">
+        <span
+          aria-hidden
+          className="num flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gold/40 text-[11px] font-black text-gold"
+        >
+          {Math.round(current.percent * 100)}%
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold">{copy.title}</p>
+          <p className="truncate text-xs text-ink-mute">
+            {current.setName} · {copy.body}
+          </p>
+        </div>
+        <button onClick={dismiss} className="text-xs font-semibold text-ink-mute" aria-label="Dismiss">
+          Close
         </button>
       </div>
-    </div>
-  );
-}
-
-function Confetti() {
-  const colors = ['#FFC93C', '#2DD4A7', '#FF8A3D', '#7C9CFF', '#F472B6'];
-  const pieces = Array.from({ length: 44 }, (_, i) => ({
-    left: (i * 37) % 100,
-    delay: (i % 11) * 0.12,
-    duration: 2.4 + ((i * 7) % 15) / 10,
-    color: colors[i % colors.length]!,
-  }));
-  return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
-      {pieces.map((p, i) => (
-        <span
-          key={i}
-          className="confetti-piece"
-          style={{
-            left: `${p.left}%`,
-            background: p.color,
-            animationDelay: `${p.delay}s`,
-            animationDuration: `${p.duration}s`,
-          }}
-        />
-      ))}
     </div>
   );
 }

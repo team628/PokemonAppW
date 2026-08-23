@@ -1,0 +1,208 @@
+name: CI
+
+on:
+  # Pull requests cover feature branches; push covers what lands on main.
+  # Both firing on a PR branch would run the whole suite twice on one commit.
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+
+  test:
+    name: PostgreSQL test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      # Any provider request that would leave the runner is an error. The
+      # pinned snapshot is meant to satisfy every read; without this a missing
+      # file would fall through to the live API and quietly reintroduce the
+      # flakiness the snapshot exists to remove.
+      SETVALUE_PROVIDER_OFFLINE: '1'
+      # Local development identity. Deliberately NOT a Supabase project: there
+      # are no Supabase credentials in CI, and substituting one would make the
+      # blocked checks below look like they had passed.
+      SETVALUE_ALLOW_LOCAL_AUTH: 'yes'
+      SETVALUE_LOCAL_AUTH_SECRET: ci-local-auth-secret
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # The integrity, parity and import suites assert against the real
+      # catalog — 174 sets, 20,444 cards, >85% price coverage. The snapshot is
+      # a capture of real provider data, not synthesized, so those assertions
+      # keep their meaning while the run stays deterministic. ci-live.yml is
+      # what checks the snapshot against the live providers.
+      - name: Restore pinned provider snapshot
+        run: node scripts/pg/snapshot.mjs restore
+
+      - name: Apply migrations
+        run: npm run migrate
+
+      # A redeploy re-applies the whole set, so "it works on an empty database"
+      # is not the property that matters. A migration that is only idempotent by
+      # assumption fails here rather than during a deploy — and a second pass
+      # would also expose any migration that grants a privilege an earlier one
+      # revoked.
+      - name: Re-apply migrations (they must be idempotent)
+        run: npm run migrate
+      - name: Ingest catalog
+        run: npm run ingest:catalog
+      - name: Ingest prices
+        run: npm run ingest:prices
+
+      # The same gate that must pass before a deployment is exposed. Running it
+      # here means a migration that reopens one of the privilege holes fails the
+      # pull request rather than the deploy.
+      - name: Verify the database is safe to expose
+        run: npm run verify
+
+      - name: Report ingested corpus
+        run: |
+          psql "$DATABASE_URL" -c "
+            select (select count(*) from public.sets)           as sets,
+                   (select count(*) from public.cards)          as cards,
+                   (select count(*) from public.card_variants)  as printings,
+                   (select count(*) from public.prices)         as prices,
+                   (select max(observed_on) from public.prices) as newest_price;"
+
+      # Includes the adversarial RLS suite, SQL-vs-TypeScript completion
+      # parity, catalog integrity, concurrency, demand-index reconciliation,
+      # import throughput and the billing feature flag.
+      - name: Test suite
+        run: npm test
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build
+        run: npm run build
+
+      - name: Start server
+        run: |
+          NODE_ENV=production npx next start -p 3100 > /tmp/server.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:3100/signin && exit 0
+            sleep 1
+          done
+          echo "server did not come up"; cat /tmp/server.log; exit 1
+
+      # The signup form requires a private-beta invite code. Seed a genuine one
+      # into the isolated CI database through the real owner function — no
+      # application change, no bypass, no production code — and hand it to the
+      # e2e so it signs up exactly as an invited collector would. The gate flag
+      # stays OFF here (CI's local-auth default, so the sibling identity steps
+      # below still mint freely); the gate's validation + atomic consumption is
+      # proven against the real trigger in tests/pg/invite-gate.test.ts.
+      - name: Seed a private-beta invite code for the E2E signup
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "select public.create_invite_code('CI-E2E-SIGNUP', 100, null, 'ci-e2e-signup');"
+          echo "E2E_INVITE_CODE=CI-E2E-SIGNUP" >> "$GITHUB_ENV"
+
+      - name: Browser end-to-end
+        run: node tests/e2e/flow.mjs http://localhost:3100
+
+      # A DOM-node bound on the largest master set, proved by scrolling it.
+      - name: Set-grid windowing stays bounded
+        run: |
+          COOKIE="$(npx tsx scripts/ci/local-identity.ts ci-windowing@example.test)"
+          node tests/e2e/virtualization.mjs http://localhost:3100 "$COOKIE"
+
+      # The signature moment, and the once-only semantics behind it, at both
+      # motion preferences.
+      - name: Set completion moment
+        run: node tests/e2e/completion.mjs http://localhost:3100
+
+      # The other half of the artwork question: the URLs the server renders,
+      # fetched from the real provider CDN. Reports BLOCKED rather than failing
+      # where the runner has no route to the image host.
+      - name: Real artwork
+        run: |
+          COOKIE="$(npx tsx scripts/ci/local-identity.ts ci-artwork-real@example.test)"
+          node tests/e2e/artwork.mjs http://localhost:3100 "$COOKIE"
+
+      # Every screen with the image CDN unreachable — the normal condition for
+      # Card Show mode, not an edge case.
+      - name: No artwork
+        run: |
+          COOKIE="$(npx tsx scripts/ci/local-identity.ts ci-artwork@example.test)"
+          node tests/e2e/no-artwork.mjs http://localhost:3100 "$COOKIE"
+
+      - name: Concurrency and idempotency over HTTP
+        run: |
+          COOKIE="$(npx tsx scripts/ci/local-identity.ts ci-concurrency@example.test)"
+          node tests/load/concurrency.mjs http://localhost:3100 "$COOKIE"
+
+      - name: Server log
+        if: always()
+        run: tail -50 /tmp/server.log || true
+
+      # Stated in the job summary so a green tick is not read as more coverage
+      # than it is.
+      - name: Declare unverified surface
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ### Not verified by this run
+
+          These need credentials, extensions or live services that do not exist in
+          PR validation. They are reported here rather than stubbed, skipped
+          silently, or asserted against a substitute that would make them look green.
+
+          - **Supabase Auth** — no project credentials. Password verification, magic
+            links and password reset are Supabase's; CI runs the local development
+            identity provider instead, so the browser check *"a wrong password is
+            rejected"* reports `BLOCKED` rather than passing. The sign-in throttle in
+            front of it *is* exercised.
+          - **pg_cron / pg_net scheduling** — not available on the stock `postgres:16`
+            image. Migration 0007 detects this and skips registration;
+            `supabase/schedule.sql` is deliberately not applied here.
+          - **Supavisor connection pooler** — CI connects straight to PostgreSQL. The
+            transaction-mode pooler production uses on Vercel is untested here.
+          - **Live provider APIs** — this run is offline against a pinned snapshot of
+            real provider data, so it is deterministic. The live catalog and price
+            APIs are exercised by the `Live provider data` workflow on a schedule.
+          - **The 5,001-collector load harness** — generating that population takes
+            about six minutes and measures the runner more than the code. Run it
+            locally with `npm run load:generate -- 5000`.
+          EOF

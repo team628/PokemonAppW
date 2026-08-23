@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { CONDITIONS, CONDITION_LABEL, type Condition } from '@/lib/domain/conditions';
-import type { Variant } from '@/lib/catalog/variants';
 import type { GoalMode } from '@/lib/domain/goals';
 
 export function CardActions({
@@ -13,7 +12,7 @@ export function CardActions({
   mode,
 }: {
   cardId: string;
-  variant: Variant;
+  variant: string;
   owned: number;
   setId: string;
   mode: GoalMode;
@@ -91,6 +90,13 @@ export function CardActions({
 
       {open && (
         <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="col-span-2 rounded-lg border border-ink-line bg-ink px-3 py-2">
+            <p className="text-[11px] leading-relaxed text-ink-mute">
+              Logging a card as graded keeps it in your collection and counts it toward set
+              completion, but SetValue will not put a value on it — a slab and a raw copy trade at
+              completely different prices and there is no graded price source here.
+            </p>
+          </div>
           <div>
             <label className="label" htmlFor={`cond-${cardId}-${variant}`}>Condition</label>
             <select

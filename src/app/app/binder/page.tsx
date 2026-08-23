@@ -1,88 +1,66 @@
 import Link from 'next/link';
-import { requireUser } from '@/lib/auth';
-import { getDb } from '@/lib/db';
-import { getSet } from '@/lib/repo/catalog';
-import { goalViews, metricsForSet } from '@/lib/services/goals';
+import { requireUser } from '@/lib/auth/session';
+import { myGoals } from '@/lib/services/pg';
+import { withIdentity } from '@/lib/db/pg';
 import { TopBar } from '@/components/AppShell';
 import { Empty, SourceNote } from '@/components/ui';
 import { BinderPages, type BinderSlot } from '@/components/BinderPages';
-import { primaryVariantMap, setRequirements } from '@/lib/repo/catalog';
-import { ownedIndex, requirementsForMode, type GoalMode } from '@/lib/domain/goals';
-import { ownedSlotsForSet } from '@/lib/services/goals';
+import type { GoalMode } from '@/lib/domain/goals';
+import type { Variant } from '@/lib/catalog/variants';
 
 export const dynamic = 'force-dynamic';
 
 export default async function BinderPage({
   searchParams,
-}: {
-  searchParams: Promise<{ set?: string; mode?: string; pocket?: string }>;
-}) {
+}: { searchParams: Promise<{ set?: string; mode?: string; pocket?: string }> }) {
   const sp = await searchParams;
   const user = await requireUser();
-  const db = getDb();
+  const goals = await myGoals(user.id);
+  const setId = sp.set ?? goals[0]?.setId;
 
-  const views = goalViews(db, user.id);
-  const setId = sp.set ?? views[0]?.set.id;
   if (!setId) {
     return (
       <>
         <TopBar title="Binder" back="/app" />
         <main className="px-4 pt-4">
-          <Empty
-            title="Binder view needs a set"
+          <Empty title="Binder view needs a set"
             body="Pick a set and SetValue lays it out exactly as it sits in a binder — page by page, pocket by pocket, with the holes visible."
-            action={{ href: '/app/sets', label: 'Choose a set' }}
-          />
+            action={{ href: '/app/sets', label: 'Choose a set' }} />
         </main>
       </>
     );
   }
 
-  const set = getSet(db, setId)!;
   const mode: GoalMode =
     (['main', 'complete', 'master'] as const).find((m) => m === sp.mode) ??
-    views.find((v) => v.set.id === setId)?.goal.mode ??
-    'main';
+    goals.find((g) => g.setId === setId)?.mode ?? 'main';
 
-  const all = setRequirements(db, setId);
-  const primaries = primaryVariantMap(db, setId);
-  const required = requirementsForMode(all, mode, primaries).sort((a, b) => a.numberSort - b.numberSort);
-  const owned = ownedIndex(ownedSlotsForSet(db, user.id, setId));
-  const metrics = metricsForSet(db, user.id, setId, mode);
+  const { setName, rows } = await withIdentity(user.id, async (tx) => {
+    const s = await tx.one<{ name: string }>('select name from public.sets where id = $1', [setId]);
+    const rows = await tx.rows<{
+      card_id: string; variant: string; number: string; name: string;
+      image_small: string | null; market_cents: number | null; quantity: number;
+    }>('select * from public.set_grid($1, $2)', [setId, mode]);
+    return { setName: s?.name ?? setId, rows };
+  });
 
-  const slots: BinderSlot[] = required.map((r) => ({
-    cardId: r.cardId,
-    variant: r.variant,
-    number: r.number,
-    name: r.name,
-    imageSmall: r.imageSmall,
-    marketCents: r.marketCents,
-    owned: (owned.get(`${r.cardId}::${r.variant}`) ?? 0) > 0,
+  const slots: BinderSlot[] = rows.map((r) => ({
+    cardId: r.card_id, variant: r.variant as Variant, number: r.number, name: r.name,
+    imageSmall: r.image_small, marketCents: r.market_cents, owned: r.quantity > 0,
   }));
+  const filled = slots.filter((s) => s.owned).length;
 
   return (
     <>
-      <TopBar
-        title={`${set.name} binder`}
-        subtitle={`${metrics.ownedCount}/${metrics.requiredCount} pockets filled`}
-        back={`/app/sets/${setId}?mode=${mode}`}
-      />
+      <TopBar title={`${setName} binder`} subtitle={`${filled}/${slots.length} pockets filled`}
+        back={`/app/sets/${setId}?mode=${mode}`} />
       <main className="px-4 pb-8 pt-4">
-        <BinderPages
-          slots={slots}
-          setName={set.name}
-          initialPocket={sp.pocket === '4' ? 4 : sp.pocket === '12' ? 12 : 9}
-        />
-
+        <BinderPages slots={slots} setName={setName}
+          initialPocket={sp.pocket === '4' ? 4 : sp.pocket === '12' ? 12 : 9} />
         <div className="mt-5 flex gap-2">
-          <Link href={`/app/binder/pull?set=${setId}&mode=${mode}`} className="btn-ghost flex-1">
-            Printable pull list
-          </Link>
-          <Link href={`/app/show?set=${setId}&mode=${mode}`} className="btn-ghost flex-1">
-            Card Show mode
-          </Link>
+          <Link href={`/app/binder/pull?set=${setId}&mode=${mode}`} className="btn-ghost flex-1">Printable pull list</Link>
+          <Link href={`/app/show?set=${setId}&mode=${mode}`} className="btn-ghost flex-1">Card Show mode</Link>
         </div>
-
         <SourceNote className="mt-5 border-t border-ink-line pt-4">
           Pages are laid out in card-number order, which is how a set binder is filled. Empty
           pockets are the cards you are missing — the same list Card Show mode hands you when you

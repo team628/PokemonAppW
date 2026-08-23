@@ -1,0 +1,848 @@
+{
+ "TRULY_UNREPRESENTED_no_base_anywhere": [
+  {
+   "fullName": "Mega Zeraora ex - 089",
+   "number": "089",
+   "set": "mep",
+   "treat": "base",
+   "$": 0
+  },
+  {
+   "fullName": "Mega Darkrai ex - 090",
+   "number": "090",
+   "set": "mep",
+   "treat": "base",
+   "$": 0
+  },
+  {
+   "fullName": "Mega Dragonite ex - 091",
+   "number": "091",
+   "set": "mep",
+   "treat": "base",
+   "$": 0
+  },
+  {
+   "fullName": "Metal Energy (#3)",
+   "number": "3/30",
+   "set": "xy-trainer-kit-bisharp-and-wigglytuff",
+   "treat": "base",
+   "$": 0
+  },
+  {
+   "fullName": "Metal Energy (#6)",
+   "number": "6/30",
+   "set": "xy-trainer-kit-bisharp-and-wigglytuff",
+   "treat": "base",
+   "$": 0
+  },
+  {
+   "fullName": "Metal Energy (#10)",
+   "number": "10/30",
+   "set": "xy-trainer-kit-bisharp-and-wigglytuff",
+   "treat": "base",
+   "$": 0
+  },
+  {
+   "fullName": "Fairy Energy (#3)",
+   "number": "3/30",
+   "set": "xy-trainer-kit-bisharp-and-wigglytuff",
+   "treat": "base",
+   "$": 0
+  },
+  {
+   "fullName": "Fairy Energy (#6)",
+   "number": "6/30",
+   "set": "xy-trainer-kit-bisharp-and-wigglytuff",
+   "treat": "base",
+   "$": 0
+  },
+  {
+   "fullName": "Fairy Energy (#10)",
+   "number": "10/30",
+   "set": "xy-trainer-kit-bisharp-and-wigglytuff",
+   "treat": "base",
+   "$": 0
+  },
+  {
+   "fullName": "Darkness Energy (2023)",
+   "number": "007",
+   "set": "professor-program-promos",
+   "treat": "base",
+   "$": 0
+  }
+ ],
+ "MAIN_SET_BASE_PRESENT_treatment_not_added": [
+  {
+   "fullName": "Rockruff - 116/193 (Cosmos Holo)",
+   "number": "116/193",
+   "set": "svp",
+   "treat": "cosmos_holo",
+   "$": 0,
+   "at": "sv2-116"
+  },
+  {
+   "fullName": "Piplup (DP03) - 2008 (Dylan Lefavour)",
+   "number": "DP03",
+   "set": "world-championship-decks",
+   "treat": "base",
+   "$": 0,
+   "at": "dpp-DP03"
+  },
+  {
+   "fullName": "Gabite - 59/147 (Championship Promo) [Staff]",
+   "number": "059/147",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "pl3-59"
+  },
+  {
+   "fullName": "Giovanni's Scheme - 138/162 (Regional Championships) [Staff]",
+   "number": "138/165",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "xy8-138"
+  },
+  {
+   "fullName": "Cynthia - 119a/156 (Regional Championships) [Staff]",
+   "number": "119a/156",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "sm5-119a"
+  },
+  {
+   "fullName": "Lillie - 215a/156 (Regional Championships) [Staff]",
+   "number": "125a/156",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "sm5-125a"
+  },
+  {
+   "fullName": "Aegislash - 85/146 (Regional Championships) [Staff]",
+   "number": "085/146",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "xy1-85"
+  },
+  {
+   "fullName": "Pokemon Communication - 152a/152 (Oceania Championships) [Staff]",
+   "number": "152a/181",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "sm9-152a"
+  },
+  {
+   "fullName": "Jolteon - 37/108 (Regional Championships) [Staff]",
+   "number": "037/108",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "bw5-37"
+  },
+  {
+   "fullName": "Blaziken - 14/111 (National Championships) [Staff]",
+   "number": "014/111",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "xy3-14"
+  },
+  {
+   "fullName": "Poliwhirl - 37/95 (League Promo) [Staff]",
+   "number": "037/095",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "hgss2-37"
+  },
+  {
+   "fullName": "Poliwrath - 21/95 (League Promo) [Staff]",
+   "number": "021/095",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "hgss2-21"
+  },
+  {
+   "fullName": "Choice Band - 121a/145 (Oceania Championships)",
+   "number": "121a/145",
+   "set": "league-and-championship-cards",
+   "treat": "base",
+   "$": 0,
+   "at": "sm2-121a"
+  },
+  {
+   "fullName": "Choice Band - 121a/145 (North America Championships) [Staff]",
+   "number": "121a/145",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "sm2-121a"
+  },
+  {
+   "fullName": "Machamp - 9/101 (National Championships)",
+   "number": "009/101",
+   "set": "league-and-championship-cards",
+   "treat": "national_championship",
+   "$": 0,
+   "at": "ex5-9"
+  },
+  {
+   "fullName": "Machamp - 9/101 (National Championships) [Staff]",
+   "number": "009/101",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "ex5-9"
+  },
+  {
+   "fullName": "Charizard - 100/97 (National Championships)",
+   "number": "100/097",
+   "set": "league-and-championship-cards",
+   "treat": "national_championship",
+   "$": 0,
+   "at": "ex3-100"
+  },
+  {
+   "fullName": "Electivire - 3/130 (Regional Championships) [Staff]",
+   "number": "003/130",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "dp1-3"
+  },
+  {
+   "fullName": "Bagon - 6/20 (Regional Championships) [Staff]",
+   "number": "006/020",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "dv1-6"
+  },
+  {
+   "fullName": "Groudon - XY52 (XY Black Star Promo)",
+   "number": "XY52",
+   "set": "jumbo-cards",
+   "treat": "base",
+   "$": 0,
+   "at": "xyp-XY52"
+  },
+  {
+   "fullName": "Metal Energy - 94/109 (EX Ruby & Sapphire)",
+   "number": "94/109",
+   "set": "jumbo-cards",
+   "treat": "base",
+   "$": 0,
+   "at": "ex1-94"
+  },
+  {
+   "fullName": "Grovyle - 004 (e-League) [Winner]",
+   "number": "004",
+   "set": "jumbo-cards",
+   "treat": "league",
+   "$": 0,
+   "at": "np-4"
+  },
+  {
+   "fullName": "Marshtomp - 011 (e-League) [Winner]",
+   "number": "011",
+   "set": "jumbo-cards",
+   "treat": "league",
+   "$": 0,
+   "at": "np-11"
+  },
+  {
+   "fullName": "Arcanine - 12/99 (Prerelease) [Staff]",
+   "number": "12/99",
+   "set": "bwp",
+   "treat": "prerelease_staff",
+   "$": 0,
+   "at": "bw4-12"
+  },
+  {
+   "fullName": "Blastoise - 13/95 (Prerelease) [Staff]",
+   "number": "13/95",
+   "set": "hsp",
+   "treat": "prerelease_staff",
+   "$": 0,
+   "at": "hgss2-13"
+  },
+  {
+   "fullName": "Lucario - 53/127 (Prerelease) [Staff]",
+   "number": "53/127",
+   "set": "dpp",
+   "treat": "prerelease_staff",
+   "$": 0,
+   "at": "pl1-53"
+  },
+  {
+   "fullName": "Mothim - 42/100 (Prerelease) [Staff]",
+   "number": "42/100",
+   "set": "dpp",
+   "treat": "prerelease_staff",
+   "$": 0,
+   "at": "dp5-42"
+  },
+  {
+   "fullName": "Salamence - 19/97 (e-League)",
+   "number": "19/97",
+   "set": "np",
+   "treat": "league",
+   "$": 116.66,
+   "at": "ex3-19"
+  },
+  {
+   "fullName": "Raichu - 27/99 (Prerelease) [Staff]",
+   "number": "27/99",
+   "set": "np",
+   "treat": "prerelease_staff",
+   "$": 0,
+   "at": "ecard3-27"
+  },
+  {
+   "fullName": "Leafeon - 17/90 (Prerelease) [Staff]",
+   "number": "17/90",
+   "set": "np",
+   "treat": "prerelease_staff",
+   "$": 0,
+   "at": "hgss3-17"
+  },
+  {
+   "fullName": "Scolipede - 54/114 (Cracked Ice Holo)",
+   "number": "54/114",
+   "set": "blister-exclusives",
+   "treat": "cracked_ice",
+   "$": 0,
+   "at": "bw1-54"
+  },
+  {
+   "fullName": "Treecko - 70/106 (GEN CON)",
+   "number": "070/106",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "base",
+   "$": 0,
+   "at": "ex9-70"
+  },
+  {
+   "fullName": "Riolu - 91/127 (SDCC 2009) [Staff]",
+   "number": "091/127",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "staff",
+   "$": 0,
+   "at": "pl1-91"
+  },
+  {
+   "fullName": "Suicune - 59/214 (Legendary Pokemon Stamped)",
+   "number": "059/214",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "base",
+   "$": 0,
+   "at": "sm8-59"
+  },
+  {
+   "fullName": "Rowlet - 013/197 (Cosmos Holo)",
+   "number": "013/197",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "cosmos_holo",
+   "$": 0,
+   "at": "sv3-13"
+  },
+  {
+   "fullName": "Honedge - 131/182 (Cosmos Holo)",
+   "number": "131/182",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "cosmos_holo",
+   "$": 0,
+   "at": "sv4-131"
+  },
+  {
+   "fullName": "Grookey (Library Exclusive)",
+   "number": "011/202",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "base",
+   "$": 0,
+   "at": "swsh1-11"
+  },
+  {
+   "fullName": "Friends in Galar - 140/172 (2022)",
+   "number": "140/172",
+   "set": "professor-program-promos",
+   "treat": "base",
+   "$": 0,
+   "at": "swsh9-140"
+  },
+  {
+   "fullName": "Friends in Sinnoh - 131/159 (2023)",
+   "number": "131/159",
+   "set": "professor-program-promos",
+   "treat": "base",
+   "$": 0,
+   "at": "swsh12pt5-131"
+  },
+  {
+   "fullName": "Friends in Sinnoh - 131/159 (2023) [Staff]",
+   "number": "131/159",
+   "set": "professor-program-promos",
+   "treat": "staff",
+   "$": 0,
+   "at": "swsh12pt5-131"
+  }
+ ],
+ "PRESENT_VIA_AGG_BASE_card": [
+  {
+   "fullName": "Suicune V - 031/203",
+   "number": "031/203",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 29.07,
+   "at": "prize-pack-series-cards-31"
+  },
+  {
+   "fullName": "Malamar - 070/198",
+   "number": "070/198",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 0.33,
+   "at": "prize-pack-series-cards-70"
+  },
+  {
+   "fullName": "Galarian Moltres V - 097/198",
+   "number": "097/198",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 16.09,
+   "at": "prize-pack-series-cards-97"
+  },
+  {
+   "fullName": "Bird Keeper - 159/189",
+   "number": "159/189",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 0.97,
+   "at": "prize-pack-series-cards-159"
+  },
+  {
+   "fullName": "Copycat - 143/203",
+   "number": "143/203",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 0.41,
+   "at": "prize-pack-series-cards-143"
+  },
+  {
+   "fullName": "Mew VMAX - 114/264",
+   "number": "114/264",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 0,
+   "at": "world-championship-decks-114-mew-vmax"
+  },
+  {
+   "fullName": "Zamazenta V - 105/172",
+   "number": "105/172",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 8.53,
+   "at": "prize-pack-series-cards-105"
+  },
+  {
+   "fullName": "Colress's Experiment - 155/196",
+   "number": "155/196",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 0.23,
+   "at": "world-championship-decks-155"
+  },
+  {
+   "fullName": "Bug Catching Set - 143/167",
+   "number": "143/167",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 0.3,
+   "at": "prize-pack-series-cards-143-bug-catching-set"
+  },
+  {
+   "fullName": "Kyogre - 53/160 (Cracked Ice Holo)",
+   "number": "053/160",
+   "set": "deck-exclusives",
+   "treat": "cracked_ice",
+   "$": 5.4,
+   "at": "deck-exclusives-53-kyogre"
+  },
+  {
+   "fullName": "Dudunsparce - 129/162 (Non-Holo)",
+   "number": "129/162",
+   "set": "deck-exclusives",
+   "treat": "base",
+   "$": 0,
+   "at": "prize-pack-series-cards-129-dudunsparce"
+  },
+  {
+   "fullName": "Hisuian Arcanine - 100/167 (Non-Holo)",
+   "number": "100/167",
+   "set": "deck-exclusives",
+   "treat": "base",
+   "$": 0,
+   "at": "blister-exclusives-100"
+  },
+  {
+   "fullName": "Pokemon Communication - 98/123 (League Promo)",
+   "number": "098/123",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 276,
+   "at": "world-championship-decks-98"
+  },
+  {
+   "fullName": "Volcanion - 25/114 (Pokemon League)",
+   "number": "025/114",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0.92,
+   "at": "league-and-championship-cards-25"
+  },
+  {
+   "fullName": "Decidueye - 11/149 (Pokemon League)",
+   "number": "011/149",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0.62,
+   "at": "league-and-championship-cards-11"
+  },
+  {
+   "fullName": "Oricorio - 14/145 (Pokemon League)",
+   "number": "014/145",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0.72,
+   "at": "league-and-championship-cards-14"
+  },
+  {
+   "fullName": "Reverse Valley - 110/122 (State Championships)",
+   "number": "110/122",
+   "set": "league-and-championship-cards",
+   "treat": "state_championship",
+   "$": 1.52,
+   "at": "league-and-championship-cards-110"
+  },
+  {
+   "fullName": "Arcanine G - 15/147 (League Promo)",
+   "number": "015/147",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 16.87,
+   "at": "deck-exclusives-15"
+  },
+  {
+   "fullName": "Braixen - 12/124 (Pokemon League)",
+   "number": "012/124",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 2.65,
+   "at": "league-and-championship-cards-12"
+  },
+  {
+   "fullName": "Floette - 102/162 (Pokemon League)",
+   "number": "102/162",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 5.04,
+   "at": "league-and-championship-cards-102"
+  },
+  {
+   "fullName": "Zygarde - 100/147 (Pokemon League)",
+   "number": "100/147",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0.88,
+   "at": "league-and-championship-cards-100"
+  },
+  {
+   "fullName": "Infernape - 23/156 (Pokemon League)",
+   "number": "023/156",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 1.14,
+   "at": "league-and-championship-cards-23"
+  },
+  {
+   "fullName": "Blastoise - 14/100 (National Championships) [Staff]",
+   "number": "014/100",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "deck-exclusives-14-blastoise"
+  },
+  {
+   "fullName": "Lost Blender - 181/214 (Pokemon League)",
+   "number": "181/214",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0.37,
+   "at": "league-and-championship-cards-181"
+  },
+  {
+   "fullName": "Ace Trainer - 69/98 (International Challenge) [Staff]",
+   "number": "069/098",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "world-championship-decks-69-ace-trainer"
+  },
+  {
+   "fullName": "Ace Trainer - 69/98 (International Challenge)",
+   "number": "069/098",
+   "set": "league-and-championship-cards",
+   "treat": "base",
+   "$": 0,
+   "at": "world-championship-decks-69-ace-trainer"
+  },
+  {
+   "fullName": "Combusken - 13/111 (State Championships)",
+   "number": "013/111",
+   "set": "league-and-championship-cards",
+   "treat": "state_championship",
+   "$": 5.94,
+   "at": "league-and-championship-cards-13"
+  },
+  {
+   "fullName": "Double Colorless Energy - 90/108 (Latin America Championships) [Staff]",
+   "number": "090/108",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "league-and-championship-cards-90"
+  },
+  {
+   "fullName": "Iris's Fighting Spirit (Regional Championships) [Staff]",
+   "number": "149/159",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "prize-pack-series-cards-149-iris-s-fighting-spirit"
+  },
+  {
+   "fullName": "Eevee - 143/191 (Southeast Asia Exclusive)",
+   "number": "143/191",
+   "set": "league-and-championship-cards",
+   "treat": "base",
+   "$": 0,
+   "at": "prize-pack-series-cards-143-eevee"
+  },
+  {
+   "fullName": "Lillie's Determination - 119/132 (Ultra Ball League)",
+   "number": "119/132",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0,
+   "at": "prize-pack-series-cards-119-lillie-s-determination"
+  },
+  {
+   "fullName": "Iris's Fighting Spirit - 149/159 (Ultra Ball League)",
+   "number": "149/159",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0,
+   "at": "prize-pack-series-cards-149-iris-s-fighting-spirit"
+  },
+  {
+   "fullName": "Air Balloon (Great Ball League)",
+   "number": "079/086",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0,
+   "at": "prize-pack-series-cards-79-air-balloon"
+  },
+  {
+   "fullName": "Dawn - 087/094 (Ultra Ball League)",
+   "number": "087/094",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0,
+   "at": "prize-pack-series-cards-87-dawn"
+  },
+  {
+   "fullName": "Wally's Compassion - 132/132 (Ultra Ball League)",
+   "number": "132/132",
+   "set": "league-and-championship-cards",
+   "treat": "league",
+   "$": 0,
+   "at": "prize-pack-series-cards-132-wally-s-compassion"
+  },
+  {
+   "fullName": "Combusken - 13/111 (State Championships) [Staff]",
+   "number": "13/111",
+   "set": "league-and-championship-cards",
+   "treat": "staff",
+   "$": 0,
+   "at": "league-and-championship-cards-13"
+  },
+  {
+   "fullName": "Terapagos ex - 128/142",
+   "number": "128/142",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 0,
+   "at": "prize-pack-series-cards-128-terapagos-ex"
+  },
+  {
+   "fullName": "Pichu - 28/123 (Prerelease) [Staff]",
+   "number": "28/123",
+   "set": "np",
+   "treat": "prerelease_staff",
+   "$": 0,
+   "at": "world-championship-decks-28-pichu"
+  },
+  {
+   "fullName": "Luxio - 52/130 (Prerelease) [Staff]",
+   "number": "52/130",
+   "set": "np",
+   "treat": "prerelease_staff",
+   "$": 0,
+   "at": "league-and-championship-cards-52-luxio"
+  },
+  {
+   "fullName": "Raichu - 41/147 (Cosmos Holo)",
+   "number": "041/147",
+   "set": "blister-exclusives",
+   "treat": "cosmos_holo",
+   "$": 0,
+   "at": "league-and-championship-cards-41-raichu"
+  },
+  {
+   "fullName": "Chandelure - 20/99 (Cracked Ice Holo)",
+   "number": "020/099",
+   "set": "blister-exclusives",
+   "treat": "cracked_ice",
+   "$": 0,
+   "at": "deck-exclusives-20"
+  },
+  {
+   "fullName": "Pikachu - 58/102 (E3 Stamped with Red Cheeks)",
+   "number": "058/102",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "base",
+   "$": 0,
+   "at": "miscellaneous-cards-and-products-58"
+  },
+  {
+   "fullName": "Pikachu - 58/102 (PokeTour 1999)",
+   "number": "058/102",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "base",
+   "$": 0,
+   "at": "miscellaneous-cards-and-products-58"
+  },
+  {
+   "fullName": "Garchomp - 114/236 (Cosmos Holo)",
+   "number": "114/236",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "cosmos_holo",
+   "$": 0,
+   "at": "deck-exclusives-114"
+  },
+  {
+   "fullName": "Jangmo-o - 75/111 (Cosmos Holo) (EB Games Promo)",
+   "number": "075/111",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "cosmos_holo",
+   "$": 0,
+   "at": "miscellaneous-cards-and-products-75"
+  },
+  {
+   "fullName": "Hisuian Zoroark - 076/196 (Lost Origin Stamped)",
+   "number": "076/196",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "base",
+   "$": 4.99,
+   "at": "miscellaneous-cards-and-products-76-hisuian-zoroark"
+  },
+  {
+   "fullName": "Hisuian Zoroark - 076/196 (EB Games Exclusive)",
+   "number": "076/196",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "base",
+   "$": 0,
+   "at": "miscellaneous-cards-and-products-76-hisuian-zoroark"
+  },
+  {
+   "fullName": "Colress's Tenacity (Gym Stamp Asia Exclusive)",
+   "number": "057/064",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "base",
+   "$": 0,
+   "at": "league-and-championship-cards-57"
+  },
+  {
+   "fullName": "Charizard (Library Exclusive)",
+   "number": "14/181",
+   "set": "miscellaneous-cards-and-products",
+   "treat": "base",
+   "$": 0,
+   "at": "deck-exclusives-14-charizard"
+  },
+  {
+   "fullName": "Bianca's Devotion - 142/162",
+   "number": "142/162",
+   "set": "prize-pack-series-cards",
+   "treat": "base",
+   "$": 0,
+   "at": "prize-pack-series-cards-142-bianca-s-devotion"
+  }
+ ],
+ "PARSER_FALSE_POSITIVE_present_as_base": [
+  {
+   "fullName": "Pokemon Center Lady - 2015 (Alejandro Ng-Guzman)",
+   "number": "93/106",
+   "set": "world-championship-decks",
+   "treat": "pokemon_center",
+   "$": 1.25,
+   "at": "world-championship-decks-93"
+  },
+  {
+   "fullName": "Pokemon Center Lady - 2016 (Shintaro Ito)",
+   "number": "68/93",
+   "set": "world-championship-decks",
+   "treat": "pokemon_center",
+   "$": 0.92,
+   "at": "world-championship-decks-68"
+  }
+ ],
+ "UNRESOLVABLE_NUMBER_COLLISION_hold": [
+  {
+   "fullName": "Loudred 35/106 (State Championships)",
+   "number": "035/106",
+   "set": "league-and-championship-cards",
+   "treat": "state_championship",
+   "$": 0,
+   "cands": [
+    "ex9-35:Loudred"
+   ]
+  },
+  {
+   "fullName": "Glameow 83/130",
+   "number": "083/130",
+   "set": "countdown-calendar-promos",
+   "treat": "base",
+   "$": 0,
+   "cands": [
+    "dp1-83:Glameow"
+   ]
+  },
+  {
+   "fullName": "Tropical Winds - DP05 (Worlds 07) [Staff]",
+   "number": "DP05",
+   "set": "dpp",
+   "treat": "staff",
+   "$": 0,
+   "cands": [
+    "dpp-DP05:Tropical Wind"
+   ]
+  }
+ ]
+}

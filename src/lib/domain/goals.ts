@@ -198,7 +198,16 @@ export const MILESTONE_COPY: Record<MilestoneKind, { title: string; body: string
   complete: { title: 'Set complete', body: 'You finished it. Every card, accounted for.' },
 };
 
-/** Which milestones a goal has reached at this instant. Order matters. */
+/**
+ * Which milestones a goal has reached at this instant. Order matters.
+ *
+ * The proximity milestones ("final five", "one left") mean *you have worked
+ * down to this*, so they require progress and a set big enough for the count to
+ * mean anything. Without those guards, tracking the five-card Futsal Collection
+ * fired "Final five — every one counts now" before the collector owned a single
+ * card, which is exactly the hollow celebration that teaches people to ignore
+ * the one that matters.
+ */
 export function milestonesFor(m: GoalMetrics): MilestoneKind[] {
   const hit: MilestoneKind[] = [];
   if (m.ownedCount > 0) hit.push('started');
@@ -206,8 +215,10 @@ export function milestonesFor(m: GoalMetrics): MilestoneKind[] {
   if (m.percent >= 0.5) hit.push('pct50');
   if (m.percent >= 0.75) hit.push('pct75');
   if (m.percent >= 0.9) hit.push('pct90');
-  if (m.missingCount > 0 && m.missingCount <= 5) hit.push('final_five');
-  if (m.missingCount === 1) hit.push('one_left');
+  if (m.ownedCount > 0 && m.requiredCount > 5 && m.missingCount > 0 && m.missingCount <= 5) {
+    hit.push('final_five');
+  }
+  if (m.ownedCount > 0 && m.requiredCount > 1 && m.missingCount === 1) hit.push('one_left');
   if (m.requiredCount > 0 && m.missingCount === 0) hit.push('complete');
   return hit;
 }

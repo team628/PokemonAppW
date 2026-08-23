@@ -1,0 +1,994 @@
+{
+ "cardRows": [
+  {
+   "id": "jumbo-cards-N-pikachu-at-the-museum",
+   "set_id": "jumbo-cards",
+   "number": null,
+   "number_sort": 999999,
+   "name": "Pikachu at the Museum",
+   "supertype": "Pokémon",
+   "rarity": "Promo",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/678659_200w.jpg",
+   "provider": "tcgcsv"
+  },
+  {
+   "id": "jumbo-cards-N-shadow-lugia-nintendo-world-promo",
+   "set_id": "jumbo-cards",
+   "number": null,
+   "number_sort": 999999,
+   "name": "Shadow Lugia (Nintendo World Promo)",
+   "supertype": "Pokémon",
+   "rarity": "Promo",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/127168_200w.jpg",
+   "provider": "tcgcsv"
+  },
+  {
+   "id": "jumbo-cards-N-zoroark-and-legendary-pokemon-world-of-i",
+   "set_id": "jumbo-cards",
+   "number": null,
+   "number_sort": 999999,
+   "name": "Zoroark and Legendary Pokemon (World of Illusions Promo)",
+   "supertype": "Pokémon",
+   "rarity": "Promo",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/211493_200w.jpg",
+   "provider": "tcgcsv"
+  },
+  {
+   "id": "jumbo-cards-N-zorua-and-celebi-black-and-white-tour-pr",
+   "set_id": "jumbo-cards",
+   "number": null,
+   "number_sort": 999999,
+   "name": "Zorua and Celebi (Black and White Tour Promo)",
+   "supertype": "Pokémon",
+   "rarity": "Promo",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/211494_200w.jpg",
+   "provider": "tcgcsv"
+  },
+  {
+   "id": "jumbo-cards-N-articuno-moltres-and-zapdos-warner-bros-",
+   "set_id": "jumbo-cards",
+   "number": null,
+   "number_sort": 999999,
+   "name": "Articuno, Moltres, and Zapdos (Warner Bros. Promo)",
+   "supertype": "Pokémon",
+   "rarity": "Promo",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/211417_200w.jpg",
+   "provider": "tcgcsv"
+  }
+ ],
+ "variantRows": [
+  {
+   "card_id": "jumbo-cards-N-pikachu-at-the-museum",
+   "variant": "holofoil",
+   "is_primary": true,
+   "finish": "Holofoil",
+   "treatment": "base"
+  },
+  {
+   "card_id": "jumbo-cards-N-shadow-lugia-nintendo-world-promo",
+   "variant": "holofoil",
+   "is_primary": true,
+   "finish": "Holofoil",
+   "treatment": "base"
+  },
+  {
+   "card_id": "jumbo-cards-N-zoroark-and-legendary-pokemon-world-of-i",
+   "variant": "holofoil",
+   "is_primary": true,
+   "finish": "Holofoil",
+   "treatment": "base"
+  },
+  {
+   "card_id": "jumbo-cards-N-zorua-and-celebi-black-and-white-tour-pr",
+   "variant": "holofoil",
+   "is_primary": true,
+   "finish": "Holofoil",
+   "treatment": "base"
+  },
+  {
+   "card_id": "jumbo-cards-N-articuno-moltres-and-zapdos-warner-bros-",
+   "variant": "holofoil",
+   "is_primary": true,
+   "finish": "Holofoil",
+   "treatment": "base"
+  },
+  {
+   "card_id": "me2-91",
+   "variant": "normal__jumbo",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "jumbo"
+  },
+  {
+   "card_id": "me1-123",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "sv3-192",
+   "variant": "normal__league",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "league"
+  },
+  {
+   "card_id": "svp-45",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "svp-150",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "svp-185",
+   "variant": "holofoil__cosmos_holo",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "cosmos_holo"
+  },
+  {
+   "card_id": "svp-186",
+   "variant": "holofoil__cosmos_holo",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "cosmos_holo"
+  },
+  {
+   "card_id": "swsh4-153",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "swsh4-185",
+   "variant": "holofoil__pokemon_center",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "swsh35-60",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "swsh1-176",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "swshp-SWSH068",
+   "variant": "holofoil__prerelease_staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease_staff"
+  },
+  {
+   "card_id": "swshp-SWSH296",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "swshp-SWSH240",
+   "variant": "holofoil__prerelease_staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease_staff"
+  },
+  {
+   "card_id": "sm115-64",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "smp-SM13",
+   "variant": "holofoil__prerelease_staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease_staff"
+  },
+  {
+   "card_id": "smp-SM95",
+   "variant": "holofoil__prerelease_staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease_staff"
+  },
+  {
+   "card_id": "smp-SM97",
+   "variant": "holofoil__prerelease_staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease_staff"
+  },
+  {
+   "card_id": "smp-SM131",
+   "variant": "holofoil__prerelease_staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease_staff"
+  },
+  {
+   "card_id": "smp-SM148",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "smp-SM78",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "smp-SM161",
+   "variant": "holofoil__staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "smp-SM231",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "smp-SM231",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "smp-SM231",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "smp-SM231",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "smp-SM231",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "smp-SM231",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "smp-SM231",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "league-and-championship-cards-11-leafeon",
+   "variant": "reverseHolofoil__staff",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "league-and-championship-cards-1-snivy",
+   "variant": "reverseHolofoil__league",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "league"
+  },
+  {
+   "card_id": "league-and-championship-cards-104",
+   "variant": "reverseHolofoil__staff",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "league-and-championship-cards-11-leafeon",
+   "variant": "reverseHolofoil__staff",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "league-and-championship-cards-11-leafeon",
+   "variant": "reverseHolofoil__regional_championship",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "regional_championship"
+  },
+  {
+   "card_id": "league-and-championship-cards-40-donphan",
+   "variant": "reverseHolofoil__league",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "league"
+  },
+  {
+   "card_id": "league-and-championship-cards-60",
+   "variant": "holofoil__staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "league-and-championship-cards-52-luxio",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "league-and-championship-cards-177",
+   "variant": "reverseHolofoil__staff",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "league-and-championship-cards-57",
+   "variant": "reverseHolofoil__league",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "league"
+  },
+  {
+   "card_id": "league-and-championship-cards-131",
+   "variant": "reverseHolofoil__national_championship",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "national_championship"
+  },
+  {
+   "card_id": "league-and-championship-cards-131",
+   "variant": "reverseHolofoil__staff",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "league-and-championship-cards-131",
+   "variant": "reverseHolofoil__staff",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "league-and-championship-cards-131",
+   "variant": "reverseHolofoil__national_championship",
+   "is_primary": false,
+   "finish": "Reverse Holofoil",
+   "treatment": "national_championship"
+  },
+  {
+   "card_id": "g1-68",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "xy2-93",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "xy2-105",
+   "variant": "holofoil__pokemon_center",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "xyp-51",
+   "variant": "holofoil__prerelease_staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease_staff"
+  },
+  {
+   "card_id": "xyp-11",
+   "variant": "holofoil__prerelease",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease"
+  },
+  {
+   "card_id": "xyp-XY144",
+   "variant": "holofoil__prerelease",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease"
+  },
+  {
+   "card_id": "xyp-XY145",
+   "variant": "holofoil__prerelease",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease"
+  },
+  {
+   "card_id": "xyp-XY146",
+   "variant": "holofoil__prerelease",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease"
+  },
+  {
+   "card_id": "xyp-XY147",
+   "variant": "holofoil__prerelease",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease"
+  },
+  {
+   "card_id": "xyp-XY91",
+   "variant": "holofoil__staff",
+   "is_primary": false,
+   "finish": null,
+   "treatment": "staff"
+  },
+  {
+   "card_id": "bw4-90",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "bwp-BW28",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW50",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW48",
+   "variant": "holofoil__prerelease_staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "prerelease_staff"
+  },
+  {
+   "card_id": "bwp-BW95",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "bwp-BW28",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW28",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW28",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW28",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW28",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "bwp-BW50",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW50",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW50",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW50",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "bwp-BW50",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "hsp-HGSS18",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "hsp-HGSS18",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "hsp-HGSS18",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "hsp-HGSS18",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "dp1-108",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "dpp-DP05",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "dpp-DP25",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "dpp-DP48",
+   "variant": "normal__worlds",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "dpp-DP25",
+   "variant": "holofoil__staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "dpp-DP48",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "base4-114",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "basep-40",
+   "variant": "normal__pokemon_center",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "pokemon_center"
+  },
+  {
+   "card_id": "np-22",
+   "variant": "normal__league",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "league"
+  },
+  {
+   "card_id": "np-28",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "np-24",
+   "variant": "normal__league",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "league"
+  },
+  {
+   "card_id": "np-25",
+   "variant": "normal__league",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "league"
+  },
+  {
+   "card_id": "np-27",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "np-27",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "np-27",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "np-27",
+   "variant": "holofoil__staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "np-27",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "np-36",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "np-36",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "np-36",
+   "variant": "holofoil__staff",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "staff"
+  },
+  {
+   "card_id": "np-36",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "np-36",
+   "variant": "holofoil__worlds",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "worlds"
+  },
+  {
+   "card_id": "miscellaneous-cards-and-products-121",
+   "variant": "holofoil__cosmos_holo",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "cosmos_holo"
+  },
+  {
+   "card_id": "miscellaneous-cards-and-products-117",
+   "variant": "holofoil__cosmos_holo",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "cosmos_holo"
+  },
+  {
+   "card_id": "miscellaneous-cards-and-products-117",
+   "variant": "holofoil__cosmos_holo",
+   "is_primary": false,
+   "finish": "Holofoil",
+   "treatment": "cosmos_holo"
+  },
+  {
+   "card_id": "miscellaneous-cards-and-products-107-shellos-west-sea-sdcc-20",
+   "variant": "normal__staff",
+   "is_primary": false,
+   "finish": "Normal",
+   "treatment": "staff"
+  }
+ ],
+ "priceRows": [
+  {
+   "card_id": "jumbo-cards-N-pikachu-at-the-museum",
+   "variant": "holofoil",
+   "market_cents": 6061,
+   "productId": 678659
+  },
+  {
+   "card_id": "jumbo-cards-N-shadow-lugia-nintendo-world-promo",
+   "variant": "holofoil",
+   "market_cents": 20000,
+   "productId": 127168
+  },
+  {
+   "card_id": "jumbo-cards-N-zoroark-and-legendary-pokemon-world-of-i",
+   "variant": "holofoil",
+   "market_cents": 5500,
+   "productId": 211493
+  },
+  {
+   "card_id": "jumbo-cards-N-articuno-moltres-and-zapdos-warner-bros-",
+   "variant": "holofoil",
+   "market_cents": 10475,
+   "productId": 211417
+  },
+  {
+   "card_id": "me2-91",
+   "variant": "normal__jumbo",
+   "market_cents": 31,
+   "productId": 662172
+  },
+  {
+   "card_id": "me1-123",
+   "variant": "normal__pokemon_center",
+   "market_cents": 26,
+   "productId": 654462
+  },
+  {
+   "card_id": "sv3-192",
+   "variant": "normal__league",
+   "market_cents": 36,
+   "productId": 509784
+  },
+  {
+   "card_id": "svp-185",
+   "variant": "holofoil__cosmos_holo",
+   "market_cents": 33,
+   "productId": 627706
+  },
+  {
+   "card_id": "svp-186",
+   "variant": "holofoil__cosmos_holo",
+   "market_cents": 36,
+   "productId": 627707
+  },
+  {
+   "card_id": "swsh4-153",
+   "variant": "normal__staff",
+   "market_cents": 6,
+   "productId": 226507
+  },
+  {
+   "card_id": "swsh4-185",
+   "variant": "holofoil__pokemon_center",
+   "market_cents": 2383,
+   "productId": 226545
+  },
+  {
+   "card_id": "swsh35-60",
+   "variant": "normal__pokemon_center",
+   "market_cents": 22,
+   "productId": 223060
+  },
+  {
+   "card_id": "swsh1-176",
+   "variant": "normal__pokemon_center",
+   "market_cents": 21,
+   "productId": 208506
+  },
+  {
+   "card_id": "sm115-64",
+   "variant": "normal__pokemon_center",
+   "market_cents": 26,
+   "productId": 197724
+  },
+  {
+   "card_id": "league-and-championship-cards-1-snivy",
+   "variant": "reverseHolofoil__league",
+   "market_cents": 378,
+   "productId": 164280
+  },
+  {
+   "card_id": "league-and-championship-cards-104",
+   "variant": "reverseHolofoil__staff",
+   "market_cents": 1760,
+   "productId": 174494
+  },
+  {
+   "card_id": "league-and-championship-cards-40-donphan",
+   "variant": "reverseHolofoil__league",
+   "market_cents": 407,
+   "productId": 186826
+  },
+  {
+   "card_id": "league-and-championship-cards-177",
+   "variant": "reverseHolofoil__staff",
+   "market_cents": 2872,
+   "productId": 557100
+  },
+  {
+   "card_id": "league-and-championship-cards-131",
+   "variant": "reverseHolofoil__national_championship",
+   "market_cents": 4467,
+   "productId": 707155
+  },
+  {
+   "card_id": "g1-68",
+   "variant": "normal__pokemon_center",
+   "market_cents": 32,
+   "productId": 113726
+  },
+  {
+   "card_id": "xy2-93",
+   "variant": "normal__pokemon_center",
+   "market_cents": 30,
+   "productId": 91230
+  },
+  {
+   "card_id": "xy2-105",
+   "variant": "holofoil__pokemon_center",
+   "market_cents": 5689,
+   "productId": 91243
+  },
+  {
+   "card_id": "xyp-XY144",
+   "variant": "holofoil__prerelease",
+   "market_cents": 1084,
+   "productId": 129374
+  },
+  {
+   "card_id": "xyp-XY145",
+   "variant": "holofoil__prerelease",
+   "market_cents": 1748,
+   "productId": 129376
+  },
+  {
+   "card_id": "xyp-XY146",
+   "variant": "holofoil__prerelease",
+   "market_cents": 1742,
+   "productId": 129378
+  },
+  {
+   "card_id": "xyp-XY147",
+   "variant": "holofoil__prerelease",
+   "market_cents": 2386,
+   "productId": 129380
+  },
+  {
+   "card_id": "bw4-90",
+   "variant": "normal__pokemon_center",
+   "market_cents": 22,
+   "productId": 88215
+  },
+  {
+   "card_id": "dp1-108",
+   "variant": "normal__pokemon_center",
+   "market_cents": 40,
+   "productId": 87753
+  },
+  {
+   "card_id": "base4-114",
+   "variant": "normal__pokemon_center",
+   "market_cents": 98,
+   "productId": 106359
+  },
+  {
+   "card_id": "np-22",
+   "variant": "normal__league",
+   "market_cents": 565,
+   "productId": 83784
+  },
+  {
+   "card_id": "np-24",
+   "variant": "normal__league",
+   "market_cents": 995,
+   "productId": 84293
+  },
+  {
+   "card_id": "np-25",
+   "variant": "normal__league",
+   "market_cents": 3961,
+   "productId": 85523
+  },
+  {
+   "card_id": "miscellaneous-cards-and-products-121",
+   "variant": "holofoil__cosmos_holo",
+   "market_cents": 151,
+   "productId": 604492
+  },
+  {
+   "card_id": "miscellaneous-cards-and-products-117",
+   "variant": "holofoil__cosmos_holo",
+   "market_cents": 2656,
+   "productId": 626640
+  },
+  {
+   "card_id": "miscellaneous-cards-and-products-117",
+   "variant": "holofoil__cosmos_holo",
+   "market_cents": 5261,
+   "productId": 627793
+  }
+ ]
+}

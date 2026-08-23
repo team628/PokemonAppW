@@ -4,9 +4,12 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 data/raw/
+# data/snapshot/ is deliberately tracked: it is what makes CI deterministic.
 data/*.db
 data/*.db-*
-.env*.local
+.env
+.env.*
+!.env.example
 .DS_Store
 coverage/
 tsconfig.tsbuildinfo

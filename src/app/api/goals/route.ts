@@ -1,27 +1,26 @@
 import { z } from 'zod';
 import { goalModeSchema, withUser } from '@/lib/api';
-import { addGoal, goalViews } from '@/lib/services/goals';
+import { addGoal, myGoals } from '@/lib/services/pg';
 
 const body = z.object({ setId: z.string().min(1), mode: goalModeSchema });
 
 export async function POST(req: Request) {
-  return withUser(async ({ user, db }) => {
+  return withUser(async ({ user }) => {
     const { setId, mode } = body.parse(await req.json());
-    const goal = addGoal(db, user.id, setId, mode);
-    return { ok: true, goalId: goal.id };
+    return { ok: true, goalId: await addGoal(user.id, setId, mode) };
   });
 }
 
 export async function GET() {
-  return withUser(({ user, db }) => ({
-    goals: goalViews(db, user.id).map((v) => ({
-      goalId: v.goal.id,
-      setId: v.set.id,
-      setName: v.set.name,
-      mode: v.goal.mode,
-      percent: v.metrics.percent,
-      needCents: v.metrics.needCents,
-      missingCount: v.metrics.missingCount,
+  return withUser(async ({ user }) => ({
+    goals: (await myGoals(user.id)).map((g) => ({
+      goalId: g.goalId,
+      setId: g.setId,
+      setName: g.setName,
+      mode: g.mode,
+      percent: g.percent,
+      needCents: g.needCents,
+      missingCount: g.missingCount,
     })),
   }));
 }

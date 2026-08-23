@@ -36,6 +36,16 @@ export interface MoveEvidence {
 
 export interface Move {
   kind: MoveKind;
+  /**
+   * How many separate listings the cost figure is spread across.
+   *
+   * A total of "$6.95 for 141 cards" is arithmetically true and practically
+   * false: those are up to 141 listings from up to 141 sellers, each with its
+   * own postage. SetValue has no shipping data and will not invent a per-order
+   * figure, so it reports the card cost and states the listing count plainly
+   * instead of implying a total outlay.
+   */
+  listingCount?: number;
   goalId?: string;
   setId?: string;
   setName?: string;
@@ -195,15 +205,16 @@ export function computeMoves(ctx: MoveContext): Move[] {
             ? `One card from finishing ${g.setName}`
             : `${m.missingCount} cards from finishing ${g.setName}`,
         detail: unpriced
-          ? `${money(cost)} covers the ${m.missingCount - unpriced} with listings. ${unpriced} ${
+          ? `${money(cost)} in card prices covers the ${m.missingCount - unpriced} with listings. ${unpriced} ${
               unpriced === 1 ? 'has' : 'have'
             } no current listing.`
-          : `Approximately ${money(cost)} finishes the set.`,
+          : `${money(cost)} in card prices finishes the set.`,
         costCents: cost || null,
+        listingCount: m.missingCount - unpriced,
         deltaPoints: m.missingCount * pointOf,
         score: BAND.finish - m.missingCount * 100 + m.percent * 50,
         evidence: evidenceFrom(m.missing),
-        basis: 'Lowest current listed price per card, TCGplayer.',
+        basis: 'Lowest current listed price per card, TCGplayer. Card prices only, excluding postage.',
         confidence: unpriced ? 'estimated' : 'measured',
       });
       continue;
@@ -220,16 +231,18 @@ export function computeMoves(ctx: MoveContext): Move[] {
         setId: g.setId,
         setName: g.setName,
         mode: g.mode,
-        headline: `${picked.length} of your missing ${g.setName} cards cost about ${money(costCents)}`,
-        detail: `That moves you from ${(m.percent * 100).toFixed(1)}% to about ${(newPercent * 100).toFixed(1)}% complete.`,
+        headline: `${picked.length} missing ${g.setName} cards, ${money(costCents)} in card prices`,
+        detail: `That moves you from ${(m.percent * 100).toFixed(1)}% to about ${(newPercent * 100).toFixed(1)}% complete. Spread across ${picked.length} listings — postage is not included.`,
         costCents,
+        listingCount: picked.length,
         deltaPoints,
         score:
           BAND.progress +
           Math.min(600, (deltaPoints / (costCents / 100)) * 60) +
           m.percent * 300,
         evidence: evidenceFrom(picked),
-        basis: 'Cheapest available listings for cards you are missing, TCGplayer.',
+        basis:
+          'Cheapest available listings for cards you are missing, TCGplayer. Card prices only, excluding postage.',
         confidence: 'measured',
       });
     }
@@ -247,15 +260,17 @@ export function computeMoves(ctx: MoveContext): Move[] {
         setName: g.setName,
         mode: g.mode,
         headline: `${nearlyFree.length} ${g.setName} cards are under 50¢ each`,
-        detail: `${money(cost)} clears ${nearlyFree.length} slots — ${(nearlyFree.length * pointOf).toFixed(1)} points of completion. Worth a single bulk order or one dig through a shop's commons box.`,
+        detail: `${(nearlyFree.length * pointOf).toFixed(1)} points of completion for ${money(cost)} in card prices. These are ${nearlyFree.length} separate listings, so buying them one by one would cost far more in postage than in cards — this is a commons box to dig through at a show, or a want list to hand a single seller.`,
         costCents: cost,
+        listingCount: nearlyFree.length,
         deltaPoints: nearlyFree.length * pointOf,
         score:
           BAND.progress +
           Math.min(600, ((nearlyFree.length * pointOf) / Math.max(1, cost / 100)) * 40) +
           m.percent * 300,
         evidence: evidenceFrom(nearlyFree),
-        basis: 'Cards whose lowest listing is at or below $0.50.',
+        basis:
+          'Cards whose lowest listing is at or below $0.50. Card prices only — SetValue has no shipping data and does not estimate postage.',
         confidence: 'measured',
       });
     }

@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { inferVariants, isHoloOnlyRarity, primaryVariant } from '@/lib/catalog/variants';
-import { toRequirement, type RawReqRow } from '@/lib/repo/catalog';
-import { parseNumber } from '../scripts/ingest-catalog';
+import { withIdentity, closePool } from '@/lib/db/pg';
+import { parseNumber } from '../src/lib/sync/ingest';
+
+afterAll(async () => {
+  await closePool();
+});
 
 describe('inferVariants', () => {
   it('gives Base Set commons no reverse holo — they did not exist in 1999', () => {
@@ -64,43 +68,51 @@ describe('primaryVariant', () => {
   });
 });
 
+/**
+ * The price ladder now lives in SQL (migration 0004) because the completion
+ * engine runs there. These exercise the deployed functions directly rather
+ * than a TypeScript restatement of them, so there is nothing to drift.
+ */
 describe('price ladder', () => {
-  const base: RawReqRow = {
-    id: 'x-1', number: '1', number_sort: 1, name: 'X', rarity: 'Common',
-    image_small: null, is_secret: 0, variant: 'normal', variant_source: 'market_data',
-    is_primary: 1, market_cents: null, mid_cents: null, low_cents: null,
-    direct_cents: null, observed_on: '2026-08-17',
-  };
+  async function ladder(market: number | null, mid: number | null, low: number | null, direct: number | null = null) {
+    return withIdentity(null, async (tx) => {
+      const r = await tx.one<{ cents: number | null; basis: string | null; acq: number | null }>(
+        `select public.slot_market_cents($1, $2, $3) as cents,
+                public.slot_basis($1, $2, $3) as basis,
+                public.slot_acquisition_cents($4, $3, $1, $2) as acq`,
+        [market, mid, low, direct],
+      );
+      return r!;
+    });
+  }
 
-  it('prefers a market figure and records the basis', () => {
-    const r = toRequirement({ ...base, market_cents: 500, mid_cents: 700, low_cents: 300 });
-    expect(r.marketCents).toBe(500);
+  it('prefers a market figure and records the basis', async () => {
+    const r = await ladder(500, 700, 300);
+    expect(r.cents).toBe(500);
     expect(r.basis).toBe('market');
   });
 
-  it('falls back to mid, then low, recording which one was used', () => {
-    expect(toRequirement({ ...base, mid_cents: 700, low_cents: 300 }).basis).toBe('mid');
-    expect(toRequirement({ ...base, low_cents: 300 }).basis).toBe('low');
+  it('falls back to mid, then low, recording which one was used', async () => {
+    expect((await ladder(null, 700, 300)).basis).toBe('mid');
+    expect((await ladder(null, null, 300)).basis).toBe('low');
   });
 
-  it('returns null rather than zero when no figure exists', () => {
-    const r = toRequirement(base);
-    expect(r.marketCents).toBeNull();
+  it('returns null rather than zero when no figure exists', async () => {
+    const r = await ladder(null, null, null);
+    expect(r.cents).toBeNull();
     expect(r.basis).toBeNull();
-    expect(r.acquisitionCents).toBeNull();
+    expect(r.acq).toBeNull();
   });
 
-  it('ignores zero-valued figures instead of treating them as free', () => {
-    const r = toRequirement({ ...base, market_cents: 0, mid_cents: 250 });
-    expect(r.marketCents).toBe(250);
+  it('ignores zero-valued figures instead of treating them as free', async () => {
+    const r = await ladder(0, 250, null);
+    expect(r.cents).toBe(250);
     expect(r.basis).toBe('mid');
   });
 
-  it('picks the cheapest credible route for acquisition cost', () => {
-    const r = toRequirement({
-      ...base, market_cents: 500, mid_cents: 700, low_cents: 300, direct_cents: 275,
-    });
-    expect(r.acquisitionCents).toBe(275);
+  it('picks the cheapest credible route for acquisition cost', async () => {
+    const r = await ladder(500, 700, 300, 275);
+    expect(r.acq).toBe(275);
   });
 });
 

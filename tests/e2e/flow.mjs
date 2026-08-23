@@ -8,14 +8,26 @@
  *
  *   node tests/e2e/flow.mjs [baseUrl]
  */
+import { existsSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const BASE = process.argv[2] ?? 'http://localhost:3000';
+
+// This container ships a Chromium at a fixed path; CI installs its own through
+// Playwright. Prefer an explicit override, fall back to the preinstalled binary
+// when it is actually there, and otherwise let Playwright resolve its own.
+const PREINSTALLED = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const EXEC =
-  process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  process.env.PLAYWRIGHT_CHROMIUM ?? (existsSync(PREINSTALLED) ? PREINSTALLED : undefined);
 
 let passed = 0;
 const failures = [];
+/** Checks that cannot run here, reported as blocked rather than silently skipped. */
+const blocked = [];
+
+// Whether the deployment under test is backed by a real Supabase Auth project.
+// Some checks are only meaningful there; the rest run either way.
+const supabaseAuth = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 function check(name, condition, detail = '') {
   if (condition) {
@@ -32,8 +44,14 @@ const dollars = (text) => {
   return m ? parseFloat(m[1]) : null;
 };
 
-const browser = await chromium.launch({ executablePath: EXEC });
+const browser = await chromium.launch(EXEC ? { executablePath: EXEC } : {});
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } }); // iPhone-sized
+
+// Every assertion in this suite is about DOM content, never about artwork.
+// Waiting on the load event would make the run hostage to the image CDN, so
+// navigations settle on DOMContentLoaded instead.
+const gotoOnce = page.goto.bind(page);
+page.goto = (url, opts) => gotoOnce(url, { waitUntil: 'domcontentloaded', ...opts });
 
 try {
   const email = `e2e-${Date.now()}@example.com`;
@@ -44,6 +62,12 @@ try {
   await page.fill('#displayName', 'E2E Collector');
   await page.fill('#email', email);
   await page.fill('#password', 'password-1234');
+  // The signup form requires a private-beta invite code. The CI harness seeds a
+  // genuine one (public.create_invite_code) into the isolated database and passes
+  // it here, so this fills the field exactly as a legitimate invited user would.
+  // (In CI's local-auth mode the gate flag is off; consumption through the real
+  // enforce_beta_invite trigger is proven in tests/pg/invite-gate.test.ts.)
+  await page.fill('#inviteCode', process.env.E2E_INVITE_CODE ?? 'E2E_LOCAL_TEST_CODE');
   await page.click('button:has-text("Create account")');
   await page.waitForURL('**/onboarding', { timeout: 20000 });
   check('lands on onboarding after signup', page.url().includes('/onboarding'));
@@ -143,7 +167,7 @@ try {
     ['/app/journey', 'journey'],
     ['/app/binder', 'binder'],
     ['/app/moves', 'Next Best Move'],
-    ['/app/profile', 'Where the numbers come from'],
+    ['/app/profile', 'Data & pricing'],
   ]) {
     await page.goto(`${BASE}${path}`);
     const text = await page.locator('body').innerText();
@@ -157,18 +181,72 @@ try {
   check('journey records the tracked set', journey.includes('Started chasing'));
 
   // ---------------------------------------------------------- public sharing
-  console.log('\nsharing');
+  console.log('\nsharing (opt-in)');
   await page.goto(`${BASE}/app/profile`);
+  const profile = await page.locator('main').innerText();
+  check('sharing is off by default', /Off\. Nobody can see your collection/.test(profile));
+  check('no share link is shown while private', !/\/c\//.test(profile));
+
+  const toggle = page.locator('button[role="switch"]');
+  check('a sharing control exists', await toggle.isVisible());
+
+  // Private collections must be indistinguishable from missing ones.
+  const anon = await browser.newPage();
+  const privateResp = await anon.goto(`${BASE}/c/e2e_collector`);
+  check('private collection is not readable', (privateResp?.status() ?? 0) === 404);
+
+  await toggle.click();
+  await page.waitForTimeout(900);
   const handle = (await page.locator('main').innerText()).match(/\/c\/([a-z0-9_]+)/)?.[1];
-  check('profile exposes a share URL', !!handle);
+  check('opting in reveals the share URL', !!handle);
+
   if (handle) {
-    const anon = await browser.newPage();
-    await anon.goto(`${BASE}/c/${handle}`);
+    const resp = await anon.goto(`${BASE}/c/${handle}`);
+    check('public page renders once opted in', (resp?.status() ?? 0) === 200);
     const shared = await anon.locator('body').innerText();
-    check('public page renders without a session', shared.includes('Progress'));
+    check('public page shows progress', shared.includes('Progress'));
     check('public page hides purchase prices', !shared.toLowerCase().includes('paid'));
-    await anon.close();
+
+    // And opting back out must close it again.
+    await page.locator('button[role="switch"]').click();
+    await page.waitForTimeout(900);
+    const closed = await anon.goto(`${BASE}/c/${handle}`);
+    check('opting back out closes the page', (closed?.status() ?? 0) === 404);
   }
+  await anon.close();
+
+  // ------------------------------------------------------- sign-in throttle
+  //
+  // The limiter runs before the credential check, so it is exercisable on any
+  // identity provider. Rejecting a *wrong password* is Supabase Auth's job and
+  // cannot be driven here without a real project — that half is reported
+  // BLOCKED rather than asserted, because the local development provider does
+  // not check passwords at all.
+  console.log('\nsign-in throttle');
+  const attacker = await browser.newPage();
+  let throttled = false;
+  let wrongPasswordRejected = false;
+  for (let i = 0; i < 14 && !throttled; i++) {
+    await attacker.goto(`${BASE}/signin`);
+    await attacker.fill('#email', email);
+    await attacker.fill('#password', `wrong-guess-${i}`);
+    await attacker.click('button:has-text("Sign in")');
+    await attacker.waitForTimeout(250);
+    const text = await attacker.locator('main').innerText();
+    if (/Too many sign-in attempts/i.test(text)) throttled = true;
+    if (/did not match/i.test(text)) wrongPasswordRejected = true;
+  }
+  check('repeated sign-in attempts get throttled', throttled);
+
+  if (supabaseAuth) {
+    check('a wrong password is rejected', wrongPasswordRejected);
+  } else {
+    console.log(
+      '  BLOCKED — Supabase credentials/environment unavailable: a wrong password is rejected',
+    );
+    blocked.push('a wrong password is rejected');
+  }
+  await attacker.close();
 } catch (err) {
   failures.push(`threw: ${err.message}`);
   console.error('\nERROR', err);
@@ -176,7 +254,13 @@ try {
   await browser.close();
 }
 
-console.log(`\n${passed} passed, ${failures.length} failed`);
+console.log(
+  `\n${passed} passed, ${failures.length} failed${blocked.length ? `, ${blocked.length} blocked` : ''}`,
+);
+if (blocked.length) {
+  console.log('\nblocked — Supabase credentials/environment unavailable:');
+  for (const b of blocked) console.log(`  - ${b}`);
+}
 if (failures.length) {
   console.log('\nfailures:');
   for (const f of failures) console.log(`  - ${f}`);

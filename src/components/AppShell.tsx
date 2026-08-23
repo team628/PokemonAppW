@@ -4,11 +4,19 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 /**
- * Mobile-first shell.
+ * The shell, mobile-first and desktop-deliberate.
  *
- * The nav lives at the bottom because SetValue is used standing up, one-handed,
- * with a binder in the other hand. Every destination is inside thumb reach, and
- * the primary action (Card Show mode) is the centre target.
+ * On a phone the nav lives at the bottom, because SetValue is used standing up,
+ * one-handed, with a binder in the other hand: every destination is inside
+ * thumb reach and Card Show mode is the centre target.
+ *
+ * On a desktop none of that reasoning holds. A bottom bar on a 1440px display
+ * is a phone control stranded at the foot of a large screen, and a 672px column
+ * in the middle of that screen is a phone app someone forgot to lay out. So at
+ * `lg` the navigation becomes a persistent left rail — always visible, no
+ * thumb-reach constraint, room for labels — and the content takes the width
+ * back. It is one component and one set of breakpoints, not a second
+ * application.
  */
 
 const TABS = [
@@ -23,7 +31,7 @@ export function BottomNav() {
   const path = usePathname();
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-line bg-ink/95 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-line bg-ink/95 backdrop-blur-lg lg:hidden"
       style={{ paddingBottom: 'var(--safe-b)' }}
       aria-label="Primary"
     >
@@ -56,10 +64,72 @@ export function BottomNav() {
   );
 }
 
+export function SideNav() {
+  const path = usePathname();
+  return (
+    <nav
+      aria-label="Primary"
+      className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col border-r border-ink-line px-3 py-5 lg:flex"
+    >
+      <Link href="/app" className="px-3 pb-6 text-lg font-black tracking-tight">
+        SET<span className="text-need">VALUE</span>
+      </Link>
+      <ul className="space-y-1">
+        {TABS.map((t) => {
+          const active = t.href === '/app' ? path === '/app' : path.startsWith(t.href);
+          const Icon = t.icon;
+          return (
+            <li key={t.href}>
+              <Link
+                href={t.href}
+                aria-current={active ? 'page' : undefined}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ${
+                  active ? 'bg-white/[.07] text-white' : 'text-ink-mute hover:text-white'
+                }`}
+              >
+                <span
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                    t.primary ? 'bg-need text-ink' : 'border border-ink-line'
+                  }`}
+                >
+                  <Icon />
+                </span>
+                {t.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-auto space-y-1 border-t border-ink-line pt-3">
+        {[
+          ['/app/binder', 'Binder'],
+          ['/app/moves', 'Next Best Move'],
+          ['/app/journey', 'Journey'],
+          ['/app/profile', 'Profile'],
+        ].map(([href, label]) => (
+          <Link
+            key={href}
+            href={href}
+            aria-current={path === href ? 'page' : undefined}
+            className={`block rounded-lg px-3 py-2 text-[12px] font-semibold transition ${
+              path === href ? 'text-white' : 'text-ink-mute hover:text-white'
+            }`}
+          >
+            {label}
+          </Link>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-2xl pb-24">
-      {children}
+    <div className="lg:flex lg:items-start">
+      <SideNav />
+      <div className="mx-auto min-h-dvh w-full max-w-2xl pb-[calc(var(--nav-h)+1rem)] lg:mx-0 lg:max-w-none lg:flex-1 lg:pb-10">
+        <div className="lg:mx-auto lg:max-w-[1180px] lg:px-6">{children}</div>
+      </div>
       <BottomNav />
     </div>
   );
@@ -77,7 +147,7 @@ export function TopBar({
   back?: string;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-ink-line bg-ink/95 px-4 py-3 backdrop-blur">
+    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-ink-line bg-ink/95 px-4 py-3 backdrop-blur-lg">
       {back && (
         <Link
           href={back}
