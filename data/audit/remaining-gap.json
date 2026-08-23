@@ -120,18 +120,6 @@
   "resolvedSet": "prize-pack-series-cards"
  },
  {
-  "productId": 492592,
-  "group": "Prize Pack Series Cards",
-  "number": "079/264",
-  "name": "Inteleon VMAX",
-  "fullName": "Inteleon VMAX - 079/264",
-  "treatment": "base",
-  "marketCents": 7500,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "prize-pack-series-cards-79-air-balloon",
-  "resolvedSet": "prize-pack-series-cards"
- },
- {
   "productId": 498188,
   "group": "Prize Pack Series Cards",
   "number": "105/172",
@@ -165,18 +153,6 @@
   "marketCents": 30,
   "cls": "MISSING_TREATMENT",
   "cardId": "prize-pack-series-cards-143-eevee",
-  "resolvedSet": "prize-pack-series-cards"
- },
- {
-  "productId": 704450,
-  "group": "Prize Pack Series Cards",
-  "number": "081/088",
-  "name": "Poke Pad - 081/088",
-  "fullName": "Poke Pad - 081/088 (Cosmos Holo)",
-  "treatment": "cosmos_holo",
-  "marketCents": 835,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "prize-pack-series-cards-81-team-rocket-s-mewtwo-ex",
   "resolvedSet": "prize-pack-series-cards"
  },
  {
@@ -276,66 +252,6 @@
   "resolvedSet": "league-and-championship-cards"
  },
  {
-  "productId": 126185,
-  "group": "League & Championship Cards",
-  "number": "063/124",
-  "name": "Lucario - 63/124 (Pokemon League)",
-  "fullName": "Lucario - 63/124 (Pokemon League) [2nd Place]",
-  "treatment": "league",
-  "marketCents": 17500,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-63-squirtle",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 126189,
-  "group": "League & Championship Cards",
-  "number": "078/162",
-  "name": "Marowak - 78/162 (Pokemon League)",
-  "fullName": "Marowak - 78/162 (Pokemon League) [2nd Place]",
-  "treatment": "league",
-  "marketCents": 923,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-78-dedenne",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 126195,
-  "group": "League & Championship Cards",
-  "number": "008/111",
-  "name": "Shelmet - 8/111 (Pokemon League)",
-  "fullName": "Shelmet - 8/111 (Pokemon League) [2nd Place]",
-  "treatment": "league",
-  "marketCents": 625,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-8-salamence",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 126196,
-  "group": "League & Championship Cards",
-  "number": "008/111",
-  "name": "Shelmet - 8/111 (Pokemon League)",
-  "fullName": "Shelmet - 8/111 (Pokemon League) [3rd Place]",
-  "treatment": "league",
-  "marketCents": 749,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-8-salamence",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 126204,
-  "group": "League & Championship Cards",
-  "number": "015/114",
-  "name": "Volcarona - 15/114 (Pokemon League)",
-  "fullName": "Volcarona - 15/114 (Pokemon League) [3rd Place]",
-  "treatment": "league",
-  "marketCents": 1695,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-15-flygon",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
   "productId": 131735,
   "group": "League & Championship Cards",
   "number": "011/149",
@@ -369,30 +285,6 @@
   "marketCents": 152,
   "cls": "MISSING_TREATMENT",
   "cardId": "league-and-championship-cards-110-fighting-energy",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 147222,
-  "group": "League & Championship Cards",
-  "number": "041/147",
-  "name": "Raichu - 41/147 (League Challenge)",
-  "fullName": "Raichu - 41/147 (League Challenge) [3rd Place]",
-  "treatment": "league",
-  "marketCents": 2367,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-41-machoke",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 147227,
-  "group": "League & Championship Cards",
-  "number": "041/147",
-  "name": "Raichu - 41/147 (League Challenge)",
-  "fullName": "Raichu - 41/147 (League Challenge) [4th Place]",
-  "treatment": "league",
-  "marketCents": 2321,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-41-machoke",
   "resolvedSet": "league-and-championship-cards"
  },
  {
@@ -444,30 +336,6 @@
   "resolvedSet": "league-and-championship-cards"
  },
  {
-  "productId": 162838,
-  "group": "League & Championship Cards",
-  "number": "084/111",
-  "name": "Regigigas - 84/111 (League Challenge)",
-  "fullName": "Regigigas - 84/111 (League Challenge) [3rd Place]",
-  "treatment": "league",
-  "marketCents": 417,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-84-eevee",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 162839,
-  "group": "League & Championship Cards",
-  "number": "084/111",
-  "name": "Regigigas - 84/111 (League Challenge)",
-  "fullName": "Regigigas - 84/111 (League Challenge) [4th Place]",
-  "treatment": "league",
-  "marketCents": 508,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-84-eevee",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
   "productId": 164203,
   "group": "League & Championship Cards",
   "number": "059/147",
@@ -489,30 +357,6 @@
   "marketCents": 114,
   "cls": "MISSING_TREATMENT",
   "cardId": "league-and-championship-cards-23-glaceon",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 166501,
-  "group": "League & Championship Cards",
-  "number": "083/156",
-  "name": "Magnezone - 83/156 (League Challenge)",
-  "fullName": "Magnezone - 83/156 (League Challenge) [4th Place]",
-  "treatment": "league",
-  "marketCents": 586,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-83-polteageist",
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 166503,
-  "group": "League & Championship Cards",
-  "number": "083/156",
-  "name": "Magnezone - 83/156 (League Challenge)",
-  "fullName": "Magnezone - 83/156 (League Challenge) [3rd Place]",
-  "treatment": "league",
-  "marketCents": 460,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-83-polteageist",
   "resolvedSet": "league-and-championship-cards"
  },
  {
@@ -624,18 +468,6 @@
   "resolvedSet": "league-and-championship-cards"
  },
  {
-  "productId": 209568,
-  "group": "League & Championship Cards",
-  "number": "042/100",
-  "name": "Wartortle - 42/100",
-  "fullName": "Wartortle - 42/100 (State Championships)",
-  "treatment": "state_championship",
-  "marketCents": 5250,
-  "cls": "MISSING_CARD",
-  "cardId": null,
-  "resolvedSet": "league-and-championship-cards"
- },
- {
   "productId": 211520,
   "group": "League & Championship Cards",
   "number": "152a/181",
@@ -657,18 +489,6 @@
   "marketCents": null,
   "cls": "MISSING_CARD",
   "cardId": null,
-  "resolvedSet": "league-and-championship-cards"
- },
- {
-  "productId": 211992,
-  "group": "League & Championship Cards",
-  "number": "012/108",
-  "name": "Flareon - 12/108 (Regional Championships)",
-  "fullName": "Flareon - 12/108 (Regional Championships) [Staff]",
-  "treatment": "staff",
-  "marketCents": null,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "league-and-championship-cards-12-flareon",
   "resolvedSet": "league-and-championship-cards"
  },
  {
@@ -912,66 +732,6 @@
   "resolvedSet": "league-and-championship-cards"
  },
  {
-  "productId": 180262,
-  "group": "Jumbo Cards",
-  "number": "006",
-  "name": "Dark Ivysaur - 6",
-  "fullName": "Dark Ivysaur - 6 (Best of Game 6 Promo)",
-  "treatment": "base",
-  "marketCents": null,
-  "cls": "MISSING_CARD",
-  "cardId": null,
-  "resolvedSet": "jumbo-cards"
- },
- {
-  "productId": 210846,
-  "group": "Jumbo Cards",
-  "number": "003/012",
-  "name": "Tyranitar",
-  "fullName": "Tyranitar - 3/12",
-  "treatment": "base",
-  "marketCents": null,
-  "cls": "MISSING_CARD",
-  "cardId": null,
-  "resolvedSet": "jumbo-cards"
- },
- {
-  "productId": 211433,
-  "group": "Jumbo Cards",
-  "number": "SM174",
-  "name": "Eevee GX - SM174",
-  "fullName": "Eevee GX - SM174 (SM Black Star Promo)",
-  "treatment": "base",
-  "marketCents": null,
-  "cls": "MISSING_CARD",
-  "cardId": null,
-  "resolvedSet": "jumbo-cards"
- },
- {
-  "productId": 211437,
-  "group": "Jumbo Cards",
-  "number": "SM175",
-  "name": "Eevee GX - SM175",
-  "fullName": "Eevee GX - SM175 (SM Black Star Promo)",
-  "treatment": "base",
-  "marketCents": null,
-  "cls": "MISSING_CARD",
-  "cardId": null,
-  "resolvedSet": "jumbo-cards"
- },
- {
-  "productId": 211439,
-  "group": "Jumbo Cards",
-  "number": "SM176",
-  "name": "Eevee GX - SM176",
-  "fullName": "Eevee GX - SM176 (SM Black Star Promo)",
-  "treatment": "base",
-  "marketCents": null,
-  "cls": "MISSING_CARD",
-  "cardId": null,
-  "resolvedSet": "jumbo-cards"
- },
- {
   "productId": 211446,
   "group": "Jumbo Cards",
   "number": "XY52",
@@ -1128,18 +888,6 @@
   "resolvedSet": "hsp"
  },
  {
-  "productId": 221177,
-  "group": "HGSS Promos",
-  "number": "17/90",
-  "name": "Leafeon - 17/90",
-  "fullName": "Leafeon - 17/90 (Prerelease)",
-  "treatment": "prerelease",
-  "marketCents": 10999,
-  "cls": "MISSING_CARD",
-  "cardId": null,
-  "resolvedSet": "hsp"
- },
- {
   "productId": 153094,
   "group": "Countdown Calendar Promos",
   "number": "083/130",
@@ -1186,18 +934,6 @@
   "cls": "MISSING_CARD",
   "cardId": null,
   "resolvedSet": "dpp"
- },
- {
-  "productId": 90053,
-  "group": "Nintendo Promos",
-  "number": "026",
-  "name": "Tropical Wind - 026 (2004 World Championships)",
-  "fullName": "Tropical Wind - 026 (2004 World Championships) [Participation]",
-  "treatment": "worlds",
-  "marketCents": 21075,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "np-26",
-  "resolvedSet": "np"
  },
  {
   "productId": 213014,
@@ -1368,18 +1104,6 @@
   "resolvedSet": "miscellaneous-cards-and-products"
  },
  {
-  "productId": 253840,
-  "group": "Miscellaneous Cards & Products",
-  "number": "130/185",
-  "name": "Eevee - 130/185",
-  "fullName": "Eevee - 130/185 (Reverse Cosmos Holo)",
-  "treatment": "cosmos_holo",
-  "marketCents": 2378,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "miscellaneous-cards-and-products-130-archaludon-ex-surging-sp",
-  "resolvedSet": "miscellaneous-cards-and-products"
- },
- {
   "productId": 276391,
   "group": "Miscellaneous Cards & Products",
   "number": "059/214",
@@ -1416,30 +1140,6 @@
   "resolvedSet": "miscellaneous-cards-and-products"
  },
  {
-  "productId": 587935,
-  "group": "Miscellaneous Cards & Products",
-  "number": "001/165",
-  "name": "Bulbasaur - 001/165 (Reverse Cosmos Holo)",
-  "fullName": "Bulbasaur - 001/165 (Reverse Cosmos Holo) (Costco Exclusive)",
-  "treatment": "cosmos_holo",
-  "marketCents": 353,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "miscellaneous-cards-and-products-1-oddish-cosmos-holo",
-  "resolvedSet": "miscellaneous-cards-and-products"
- },
- {
-  "productId": 599649,
-  "group": "Miscellaneous Cards & Products",
-  "number": "024/167",
-  "name": "Teal Mask Ogerpon - 024/167",
-  "fullName": "Teal Mask Ogerpon - 024/167 (Cosmos Holo)",
-  "treatment": "cosmos_holo",
-  "marketCents": 24,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "miscellaneous-cards-and-products-24-aurorus-perfect-order-st",
-  "resolvedSet": "miscellaneous-cards-and-products"
- },
- {
   "productId": 602839,
   "group": "Miscellaneous Cards & Products",
   "number": "013/197",
@@ -1452,18 +1152,6 @@
   "resolvedSet": "miscellaneous-cards-and-products"
  },
  {
-  "productId": 626637,
-  "group": "Miscellaneous Cards & Products",
-  "number": "107/142",
-  "name": "Archaludon - 107/142",
-  "fullName": "Archaludon - 107/142 (Cosmos Holo)",
-  "treatment": "cosmos_holo",
-  "marketCents": 27,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "miscellaneous-cards-and-products-107-shellos-west-sea-sdcc-20",
-  "resolvedSet": "miscellaneous-cards-and-products"
- },
- {
   "productId": 643130,
   "group": "Miscellaneous Cards & Products",
   "number": "131/182",
@@ -1473,42 +1161,6 @@
   "marketCents": null,
   "cls": "MISSING_TREATMENT",
   "cardId": "miscellaneous-cards-and-products-131-dragonite",
-  "resolvedSet": "miscellaneous-cards-and-products"
- },
- {
-  "productId": 654775,
-  "group": "Miscellaneous Cards & Products",
-  "number": "013/131",
-  "name": "Flareon - 013/131",
-  "fullName": "Flareon - 013/131 (Cosmos Holo)",
-  "treatment": "cosmos_holo",
-  "marketCents": 143,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "miscellaneous-cards-and-products-13-delphox",
-  "resolvedSet": "miscellaneous-cards-and-products"
- },
- {
-  "productId": 654776,
-  "group": "Miscellaneous Cards & Products",
-  "number": "022/131",
-  "name": "Vaporeon - 022/131",
-  "fullName": "Vaporeon - 022/131 (Cosmos Holo)",
-  "treatment": "cosmos_holo",
-  "marketCents": 106,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "miscellaneous-cards-and-products-22-reshiram-stellar-crown-s",
-  "resolvedSet": "miscellaneous-cards-and-products"
- },
- {
-  "productId": 658500,
-  "group": "Miscellaneous Cards & Products",
-  "number": "051/182",
-  "name": "Team Rocket's Articuno - 051/182",
-  "fullName": "Team Rocket's Articuno - 051/182 (Cosmos Holo)",
-  "treatment": "cosmos_holo",
-  "marketCents": 313,
-  "cls": "MISSING_TREATMENT",
-  "cardId": "miscellaneous-cards-and-products-51-archeops",
   "resolvedSet": "miscellaneous-cards-and-products"
  },
  {

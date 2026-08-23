@@ -86,6 +86,11 @@ export const TREATMENTS = [
   'national_championship', 'regional_championship', 'state_championship',
   'prize_pack', 'league', 'pokemon_center', 'cosmos_holo', 'cracked_ice',
   'galaxy_holo', 'jumbo', 'other_recognized',
+  // 0024: competitive placement / recognition stamps. Each is an independently
+  // printed and independently priced physical identity, kept separate (never
+  // collapsed) so a "2nd Place" promo never borrows a "3rd Place" copy's value.
+  'first_place', 'second_place', 'third_place', 'fourth_place',
+  'finalist', 'participation',
 ] as const;
 export type Treatment = (typeof TREATMENTS)[number];
 
@@ -104,6 +109,12 @@ const TREATMENT_LABEL: Record<string, string> = {
   pokemon_center: 'Pokémon Center',
   jumbo: 'Jumbo',
   other_recognized: 'Special Print',
+  first_place: '1st Place',
+  second_place: '2nd Place',
+  third_place: '3rd Place',
+  fourth_place: '4th Place',
+  finalist: 'Finalist',
+  participation: 'Participation',
 };
 
 /** Short treatment codes for compact set-grid / show-mode badges. */
@@ -113,6 +124,8 @@ const TREATMENT_SHORT: Record<string, string> = {
   state_championship: 'STATE', prize_pack: 'PP', league: 'LG', pokemon_center: 'PC',
   cosmos_holo: 'CSM', cracked_ice: 'CI', galaxy_holo: 'GLX', jumbo: 'JMB',
   other_recognized: 'SP',
+  first_place: '1ST', second_place: '2ND', third_place: '3RD', fourth_place: '4TH',
+  finalist: 'FIN', participation: 'PART',
 };
 
 /** Treatments whose printing IS the whole label (a holo pattern, not a stamp). */

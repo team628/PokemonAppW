@@ -1,0 +1,178 @@
+[
+ {
+  "cardId": "world-championship-decks-93",
+  "cardName": "Pokemon Center Lady",
+  "token": "normal__pokemon_center",
+  "finish": "Normal",
+  "treatment": "pokemon_center",
+  "productId": 481234,
+  "marketCents": 125,
+  "fullName": "Pokemon Center Lady - 2015 (Alejandro Ng-Guzman)",
+  "reason": "PARSER_FALSE_POSITIVE — \"pokemon center\" is part of the card NAME (Pokémon Center Lady), not a stamp treatment"
+ },
+ {
+  "cardId": "world-championship-decks-68",
+  "cardName": "Pokemon Center Lady",
+  "token": "normal__pokemon_center",
+  "finish": "Normal",
+  "treatment": "pokemon_center",
+  "productId": 481785,
+  "marketCents": 92,
+  "fullName": "Pokemon Center Lady - 2016 (Shintaro Ito)",
+  "reason": "PARSER_FALSE_POSITIVE — \"pokemon center\" is part of the card NAME (Pokémon Center Lady), not a stamp treatment"
+ },
+ {
+  "cardId": "league-and-championship-cards-98",
+  "cardName": "Pokemon Communication",
+  "token": "holofoil__league",
+  "finish": "Holofoil",
+  "treatment": "league",
+  "productId": 123184,
+  "marketCents": 27600,
+  "fullName": "Pokemon Communication - 98/123 (League Promo)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-25",
+  "cardName": "Volcanion",
+  "token": "reverseHolofoil__league",
+  "finish": "Reverse Holofoil",
+  "treatment": "league",
+  "productId": 126017,
+  "marketCents": 92,
+  "fullName": "Volcanion - 25/114 (Pokemon League)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-11",
+  "cardName": "Decidueye",
+  "token": "reverseHolofoil__league",
+  "finish": "Reverse Holofoil",
+  "treatment": "league",
+  "productId": 131735,
+  "marketCents": 62,
+  "fullName": "Decidueye - 11/149 (Pokemon League)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-14",
+  "cardName": "Oricorio",
+  "token": "reverseHolofoil__league",
+  "finish": "Reverse Holofoil",
+  "treatment": "league",
+  "productId": 133846,
+  "marketCents": 72,
+  "fullName": "Oricorio - 14/145 (Pokemon League)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-110",
+  "cardName": "Reverse Valley",
+  "token": "reverseHolofoil__state_championship",
+  "finish": "Reverse Holofoil",
+  "treatment": "state_championship",
+  "productId": 145872,
+  "marketCents": 152,
+  "fullName": "Reverse Valley - 110/122 (State Championships)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-15-arcanine-g",
+  "cardName": "Arcanine G",
+  "token": "reverseHolofoil__league",
+  "finish": "Reverse Holofoil",
+  "treatment": "league",
+  "productId": 153233,
+  "marketCents": 1687,
+  "fullName": "Arcanine G - 15/147 (League Promo)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-12",
+  "cardName": "Braixen",
+  "token": "reverseHolofoil__league",
+  "finish": "Reverse Holofoil",
+  "treatment": "league",
+  "productId": 153303,
+  "marketCents": 265,
+  "fullName": "Braixen - 12/124 (Pokemon League)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-102",
+  "cardName": "Floette",
+  "token": "reverseHolofoil__league",
+  "finish": "Reverse Holofoil",
+  "treatment": "league",
+  "productId": 153306,
+  "marketCents": 504,
+  "fullName": "Floette - 102/162 (Pokemon League)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-100",
+  "cardName": "Zygarde",
+  "token": "reverseHolofoil__league",
+  "finish": "Reverse Holofoil",
+  "treatment": "league",
+  "productId": 154999,
+  "marketCents": 88,
+  "fullName": "Zygarde - 100/147 (Pokemon League)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-23",
+  "cardName": "Infernape",
+  "token": "reverseHolofoil__league",
+  "finish": "Reverse Holofoil",
+  "treatment": "league",
+  "productId": 166499,
+  "marketCents": 114,
+  "fullName": "Infernape - 23/156 (Pokemon League)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-181",
+  "cardName": "Lost Blender",
+  "token": "reverseHolofoil__league",
+  "finish": "Reverse Holofoil",
+  "treatment": "league",
+  "productId": 182886,
+  "marketCents": 37,
+  "fullName": "Lost Blender - 181/214 (Pokemon League)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "league-and-championship-cards-13",
+  "cardName": "Combusken",
+  "token": "reverseHolofoil__state_championship",
+  "finish": "Reverse Holofoil",
+  "treatment": "state_championship",
+  "productId": 209543,
+  "marketCents": 594,
+  "fullName": "Combusken - 13/111 (State Championships)",
+  "reason": "REDUNDANT_WITH_BASE — aggregation-set base variant already represents this league/championship promo identity"
+ },
+ {
+  "cardId": "prize-pack-series-cards-128-terapagos-ex",
+  "cardName": "Terapagos ex",
+  "token": "holofoil__base",
+  "finish": "Holofoil",
+  "treatment": "base",
+  "productId": 594779,
+  "marketCents": null,
+  "fullName": "Terapagos ex - 128/142",
+  "reason": "PRESENT_ELSEWHERE — plain-number base belongs to its main set, already catalogued there; not a prize-pack-specific identity"
+ },
+ {
+  "cardId": "prize-pack-series-cards-142-bianca-s-devotion",
+  "cardName": "Bianca's Devotion",
+  "token": "holofoil__base",
+  "finish": "Holofoil",
+  "treatment": "base",
+  "productId": 685998,
+  "marketCents": null,
+  "fullName": "Bianca's Devotion - 142/162",
+  "reason": "PRESENT_ELSEWHERE — plain-number base belongs to its main set, already catalogued there; not a prize-pack-specific identity"
+ }
+]

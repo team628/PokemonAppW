@@ -59,6 +59,20 @@ describe('variant labels (issue 2: no blank printing labels)', () => {
     expect(variantLabel('holofoil__other_recognized')).toBe('Holofoil · Special Print');
   });
 
+  it('labels the competitive placement stamps distinctly (migration 0024)', () => {
+    // Each placement is its own identity — never collapsed into one "placement".
+    expect(variantLabel('reverseHolofoil__second_place')).toBe('Reverse Holofoil · 2nd Place');
+    expect(variantLabel('reverseHolofoil__third_place')).toBe('Reverse Holofoil · 3rd Place');
+    expect(variantLabel('reverseHolofoil__fourth_place')).toBe('Reverse Holofoil · 4th Place');
+    expect(variantLabel('holofoil__first_place')).toBe('Holofoil · 1st Place');
+    expect(variantLabel('normal__participation')).toBe('Normal · Participation');
+    expect(variantLabel('normal__finalist')).toBe('Normal · Finalist');
+    // distinct short codes so a grid badge never conflates two placements
+    const shorts = ['first_place', 'second_place', 'third_place', 'fourth_place', 'finalist', 'participation']
+      .map((t) => variantShort(`normal__${t}`));
+    expect(new Set(shorts).size).toBe(shorts.length);
+  });
+
   it('keeps existing base printing labels unchanged', () => {
     expect(variantLabel('normal')).toBe('Normal');
     expect(variantLabel('holofoil')).toBe('Holo');
